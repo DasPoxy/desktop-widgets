@@ -35,7 +35,33 @@ WidgetCard {
   property bool barPressed: false
   property bool seeking: false
   property real seekPreviewFrac: 0
+  property bool hideWhenPaused: false
   readonly property bool barRevealed: bottomHoverHandler.hovered || videoWidgetRoot.barPressed || (rootRef && rootRef.layoutEditMode === true)
+
+  // ---------------------------------------------------------------------------
+  // 👻 Hide While Paused (right-click toggle): the whole card -- frame,
+  // shadow and all -- fades out while a loaded video isn't playing, and fades
+  // back in while the cursor is over its area. Opacity (not visible) so the
+  // hover handler keeps receiving events on the invisible card.
+  // ---------------------------------------------------------------------------
+  readonly property bool pausedHidden: videoWidgetRoot.hideWhenPaused
+    && player.hasVideo
+    && player.playbackState !== MediaPlayer.PlayingState
+    && !panelHoverHandler.hovered
+    && !videoWidgetRoot.contextMenuOpen
+    && !videoWidgetRoot.isFullscreen
+    && !videoWidgetRoot.barPressed
+    && !(rootRef && rootRef.layoutEditMode === true)
+
+  opacity: videoWidgetRoot.pausedHidden ? 0.0 : 1.0
+  Behavior on opacity {
+    NumberAnimation { duration: 220; easing.type: Easing.OutCubic }
+  }
+
+  function toggleHideWhenPaused() {
+    videoWidgetRoot.hideWhenPaused = !videoWidgetRoot.hideWhenPaused
+    videoWidgetRoot.saveSetting("hideWhenPaused", videoWidgetRoot.hideWhenPaused)
+  }
 
   // ---------------------------------------------------------------------------
   // ⛶ Double-Click Fullscreen (Esc or double-click again to collapse)
@@ -224,6 +250,7 @@ WidgetCard {
     volume = getSetting("volume", 0.8)
     muted = getSetting("muted", false)
     loopVideo = getSetting("loopVideo", true)
+    hideWhenPaused = getSetting("hideWhenPaused", false)
     // A cached YouTube file can be pruned out of the cache (or the cache
     // cleared); fetch it again rather than showing "couldn't play".
     if (youtubeUrl.length > 0 && videoPath.length > 0 && !ytLoading) ytExistsCheck.running = true
@@ -244,7 +271,6 @@ WidgetCard {
 
   onVideoUrlChanged: {
     videoWidgetRoot.videoFailed = false
-    if (videoWidgetRoot.videoUrl.length > 0) player.play()
     videoWidgetRoot.updateKeyboardFocusForHover()
   }
 
@@ -317,6 +343,9 @@ WidgetCard {
     source: videoWidgetRoot.videoUrl
     videoOutput: videoOutputItem
     audioOutput: audioOut
+    // Autoplay from here, not onVideoUrlChanged: that handler runs before
+    // this `source` binding re-evaluates, so play() there hit an empty source.
+    onSourceChanged: if (String(source).length > 0) play()
     loops: videoWidgetRoot.loopVideo ? MediaPlayer.Infinite : 1
     onErrorOccurred: function(error, errorString) {
       videoWidgetRoot.videoFailed = true
@@ -537,6 +566,54 @@ WidgetCard {
           cursorShape: Qt.PointingHandCursor
           onClicked: {
             videoWidgetRoot.toggleLoop()
+            videoWidgetRoot.contextMenuOpen = false
+          }
+        }
+      }
+
+      // Hide While Paused Toggle
+      Rectangle {
+        Layout.fillWidth: true
+        implicitHeight: 28
+        radius: 6
+        color: hidePausedMouse.containsMouse ? Qt.rgba(Color.accent.r, Color.accent.g, Color.accent.b, 0.2) : "transparent"
+
+        RowLayout {
+          anchors.fill: parent
+          anchors.leftMargin: Style.space(8)
+          anchors.rightMargin: Style.space(8)
+          spacing: Style.space(8)
+
+          Text {
+            text: "\uf070"
+            font.family: Style.font.family
+            font.pixelSize: 11
+            color: videoWidgetRoot.hideWhenPaused ? Color.accent : Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.5)
+          }
+
+          Text {
+            Layout.fillWidth: true
+            text: "Hide While Paused"
+            font.family: Style.font.family
+            font.pixelSize: 11
+            color: Color.foreground
+          }
+
+          Text {
+            text: videoWidgetRoot.hideWhenPaused ? "" : ""
+            font.family: Style.font.family
+            font.pixelSize: 12
+            color: videoWidgetRoot.hideWhenPaused ? Color.accent : Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.4)
+          }
+        }
+
+        MouseArea {
+          id: hidePausedMouse
+          anchors.fill: parent
+          hoverEnabled: true
+          cursorShape: Qt.PointingHandCursor
+          onClicked: {
+            videoWidgetRoot.toggleHideWhenPaused()
             videoWidgetRoot.contextMenuOpen = false
           }
         }
