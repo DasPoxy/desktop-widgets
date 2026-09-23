@@ -14,6 +14,15 @@ QtObject {
       componentUrl: Qt.resolvedUrl("HeroClockWidget.qml")
     },
     {
+      id: "horizon_clock",
+      name: "Horizon Clock & Weather",
+      category: "Glance",
+      icon: "\uf017",
+      badge: "Resizable",
+      description: "Hero Clock & Weather, resizable: the time, date, greeting and weather scale to fit centred in whatever size you drag it to. Pick any installed Nerd Font from the right-click menu.",
+      componentUrl: Qt.resolvedUrl("HorizonClockWidget.qml")
+    },
+    {
       id: "gallery",
       name: "3D Photo Deck Stack",
       category: "Glance",

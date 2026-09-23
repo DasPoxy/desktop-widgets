@@ -1,8 +1,24 @@
 diff --git a/widgets/WidgetRegistry.qml b/widgets/WidgetRegistry.qml
-index 54e7986..eecda61 100644
+index 54e7986..ab23997 100644
 --- a/widgets/WidgetRegistry.qml
 +++ b/widgets/WidgetRegistry.qml
-@@ -147,6 +147,60 @@ QtObject {
+@@ -13,6 +13,15 @@ QtObject {
+       description: "Centerpiece dynamic desktop clock with live weather status and date display.",
+       componentUrl: Qt.resolvedUrl("HeroClockWidget.qml")
+     },
++    {
++      id: "horizon_clock",
++      name: "Horizon Clock & Weather",
++      category: "Glance",
++      icon: "\uf017",
++      badge: "Resizable",
++      description: "Hero Clock & Weather, resizable: the time, date, greeting and weather scale to fit centred in whatever size you drag it to. Pick any installed Nerd Font from the right-click menu.",
++      componentUrl: Qt.resolvedUrl("HorizonClockWidget.qml")
++    },
+     {
+       id: "gallery",
+       name: "3D Photo Deck Stack",
+@@ -147,6 +156,60 @@ QtObject {
        badge: "Live Feeds",
        description: "News and article reader with customizable RSS/Atom feeds, channel tabs, and browser integration.",
        componentUrl: Qt.resolvedUrl("rss-feed/RssFeedWidget.qml")

@@ -10,6 +10,7 @@ overlay: only the files that are new or changed relative to upstream.
 
 | Widget | File | What it does |
 | --- | --- | --- |
+| **Horizon Clock & Weather** | `HorizonClockWidget.qml` | Fork of Hero Clock & Weather that's resizable: greeting, weather, time and date scale together to fit centred in whatever size the card is dragged to (160×80 up to wall-sized). Right-click to pick any installed Nerd Font (searchable, previewed in-font), plus Hero's 12/24h, seconds, compact date, °F/°C and greeting options. |
 | **Karaoke Player** | `MprisPlayerWidget.qml` + `get-lyrics.sh`, `get-mute.sh` | Wireframe spinning-record player for any MPRIS source. Seekable progress, prev/play/next, live cava spectrum, source chips (scroll to cycle), synced karaoke-style lyrics from a local `.lrc` or LRCLIB, beside or below the controls. Per-track timing nudge, lyric size S–XXL. Space/M hotkeys on hover (M mutes that app's own audio stream). Scales from 260×150 to wall-sized. |
 | **Video Player** | `VideoPlayerWidget.qml` + `get-video.sh`, `get-youtube.sh` | Loops a local video, or a YouTube URL downloaded via yt-dlp to a cache. Volume/mute, scroll-wheel scrubbing, Space/M hotkeys on hover, double-click fullscreen. |
 | **Visit Another Realm** | `RealmPortalWidget.qml` + `get-random-game.sh` | One button launches a random installed game from Steam, Heroic or Lutris, over shuffling cover-art swatches (angle: ╲ │ ╱). Custom title/button text, icon picker, per-game exclusion list. |
