@@ -1,0 +1,122 @@
+diff --git a/widgets/WidgetRegistry.qml b/widgets/WidgetRegistry.qml
+index 54e7986..eecda61 100644
+--- a/widgets/WidgetRegistry.qml
++++ b/widgets/WidgetRegistry.qml
+@@ -147,6 +147,60 @@ QtObject {
+       badge: "Live Feeds",
+       description: "News and article reader with customizable RSS/Atom feeds, channel tabs, and browser integration.",
+       componentUrl: Qt.resolvedUrl("rss-feed/RssFeedWidget.qml")
++    },
++    {
++      id: "video_player",
++      name: "Video Player",
++      category: "Media",
++      icon: "\uf03d",
++      badge: "Looping",
++      description: "Browse and select a video to play looping on the desktop, with play/pause, mute, and a volume slider.",
++      componentUrl: Qt.resolvedUrl("VideoPlayerWidget.qml")
++    },
++    {
++      id: "mpris_player",
++      name: "Karaoke Player",
++      category: "Media",
++      icon: "\uf130",
++      badge: "Karaoke",
++      description: "Wireframe spinning-record player for any MPRIS source with karaoke-style synced lyrics (beside or below the controls), seekable progress, shuffle/loop, a live cava spectrum, and a source switcher. Scales from compact to wall-sized.",
++      componentUrl: Qt.resolvedUrl("MprisPlayerWidget.qml")
++    },
++    {
++      id: "realm_portal",
++      name: "Visit Another Realm",
++      category: "Fun",
++      icon: "\ueefa",
++      badge: "Custom",
++      description: "One button: picks a random installed game from Steam, Heroic, or Lutris and launches it.",
++      componentUrl: Qt.resolvedUrl("RealmPortalWidget.qml")
++    },
++    {
++      id: "system_about",
++      name: "About This System",
++      category: "System",
++      icon: "\uf05a",
++      badge: "fastfetch",
++      description: "fastfetch/Omarchy-style system summary (host, CPU, GPU, OS, uptime) plus the active theme's color palette as swatches.",
++      componentUrl: Qt.resolvedUrl("SystemAboutWidget.qml")
++    },
++    {
++      id: "system_monitor",
++      name: "System Monitor",
++      category: "System",
++      icon: "\uf200",
++      badge: "Live",
++      description: "Live CPU, GPU, and RAM utilization meters plus network activity with session-total upload/download counters.",
++      componentUrl: Qt.resolvedUrl("SystemMonitorWidget.qml")
++    },
++    {
++      id: "app_grid",
++      name: "Quick Launch Grid",
++      category: "Productivity",
++      icon: "\uf00a",
++      badge: "Paged",
++      description: "Pin apps into a 3\u00d73, 4\u00d74, or 5\u00d75 quick-launch grid, with extra pages once it fills up.",
++      componentUrl: Qt.resolvedUrl("AppGridWidget.qml")
+     }
+   ]
+ 
+diff --git a/widgets/quick-notes/QuickNotesWidget.qml b/widgets/quick-notes/QuickNotesWidget.qml
+index d499815..2b7d327 100644
+--- a/widgets/quick-notes/QuickNotesWidget.qml
++++ b/widgets/quick-notes/QuickNotesWidget.qml
+@@ -85,6 +85,35 @@ WidgetCard {
+   }
+   readonly property int completedCount: todosList.length - pendingCount
+   readonly property string notesManagerPath: Qt.resolvedUrl("notes_manager.py").toString().replace(/^file:\/\//, "")
++  readonly property string notesStateFile: Quickshell.env("HOME") + "/.local/state/omarchy/dagyr.desktop-widgets/notes.json"
++
++  // Shared by the action Process below AND the file watcher, so an external
++  // writer (anything that calls notes_manager.py directly, bypassing this
++  // widget's own UI/IPC — e.g. Claude posting a task/conclusion) shows up
++  // here live instead of only after this widget next reloads from scratch.
++  function applyNotesData(res) {
++    if (res.todos !== undefined) notesWidgetRoot.todosList = res.todos
++    if (res.scratchpad !== undefined) {
++      notesWidgetRoot.scratchpadText = res.scratchpad
++      if (scratchpadEdit.text !== res.scratchpad && !scratchpadEdit.activeFocus) {
++        scratchpadEdit.text = res.scratchpad
++      }
++    }
++    if (res.commands !== undefined) notesWidgetRoot.commandsList = res.commands
++  }
++
++  FileView {
++    id: notesFileWatcher
++    path: notesWidgetRoot.notesStateFile
++    watchChanges: true
++    printErrors: false
++    onFileChanged: reload()
++    onLoaded: {
++      try {
++        notesWidgetRoot.applyNotesData(JSON.parse(text()))
++      } catch (e) {}
++    }
++  }
+ 
+   Process {
+     id: notesProc
+@@ -93,15 +122,7 @@ WidgetCard {
+     stdout: SplitParser {
+       onRead: function(line) {
+         try {
+-          var res = JSON.parse(String(line).trim())
+-          if (res.todos !== undefined) notesWidgetRoot.todosList = res.todos
+-          if (res.scratchpad !== undefined) {
+-            notesWidgetRoot.scratchpadText = res.scratchpad
+-            if (scratchpadEdit.text !== res.scratchpad && !scratchpadEdit.activeFocus) {
+-              scratchpadEdit.text = res.scratchpad
+-            }
+-          }
+-          if (res.commands !== undefined) notesWidgetRoot.commandsList = res.commands
++          notesWidgetRoot.applyNotesData(JSON.parse(String(line).trim()))
+         } catch (e) {}
+       }
+     }
