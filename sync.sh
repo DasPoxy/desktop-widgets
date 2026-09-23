@@ -30,18 +30,20 @@ git -C "$PLUGIN" -c diff.mnemonicPrefix=false -c diff.noprefix=false diff --src-
   echo "describe=$(git -C "$PLUGIN" log -1 --format='%h %ad %s' --date=short)"
 } > "$REPO/UPSTREAM"
 
-# User-created presets (the plugin's built-ins are left out), in the plugin's
-# own export format so they can be re-imported from the desktop menu.
+# User-created presets listed in PUBLISH_LAYOUTS, in the plugin's own export
+# format so they can be re-imported from the desktop menu. Other presets stay
+# private.
+PUBLISH_LAYOUTS="${PUBLISH_LAYOUTS:-AniPop}"
 if [[ -f $STATE ]]; then
-  python3 - "$STATE" "$REPO/layouts" <<'PY'
+  python3 - "$STATE" "$REPO/layouts" "$PUBLISH_LAYOUTS" <<'PY'
 import json, sys, os, re
 state, out = sys.argv[1], sys.argv[2]
-BUILTIN = {"Default", "Minimal", "Productivity", "Full Dashboard", "Gaming"}
+PUBLISH = {n.strip() for n in sys.argv[3].split(",") if n.strip()}
 d = json.load(open(state))
 for f in os.listdir(out):
     if f.endswith(".json"): os.remove(os.path.join(out, f))
 for name, prof in (d.get("layout_profiles") or {}).items():
-    if name in BUILTIN: continue
+    if name not in PUBLISH: continue
     prof = dict(prof)
     # The active preset's live values are newer than its last explicit save.
     if name == d.get("active_profile"):
