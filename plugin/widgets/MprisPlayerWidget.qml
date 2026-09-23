@@ -48,6 +48,75 @@ WidgetCard {
     saveSetting("lyricsFontScale", v)
   }
   property var lyricsOffsets: ({}) // trackKey -> ms; + = lyrics earlier
+  property bool themeColors: true // off = accent-only, like before
+
+  // ---------------------------------------------------------------------------
+  // 🎨 Theme Palette -- Color only exposes accent/foreground/background/urgent,
+  // so the rest of the theme's colors.toml is read here. Themes name their
+  // hues either by role (magenta, cyan...) or as terminal slots (color5...),
+  // so each role tries both before falling back to the accent.
+  // ---------------------------------------------------------------------------
+  property var themePalette: ({})
+
+  function palette(keys, fallback) {
+    if (!themeColors) return fallback
+    for (var i = 0; i < keys.length; i++) {
+      var v = themePalette[keys[i]]
+      if (v) return v
+    }
+    return fallback
+  }
+  function tint(c, a) { return Qt.alpha(c, a) }
+  // Blends around the hue wheel (shorter way) rather than straight through
+  // RGB, which turns e.g. cyan -> magenta into a muddy grey midway.
+  function mixColor(a, b, t) {
+    var ha = a.hsvHue, hb = b.hsvHue
+    if (ha < 0 || a.hsvSaturation < 0.08) ha = hb // greys have no real hue
+    if (hb < 0 || b.hsvSaturation < 0.08) hb = ha
+    if (ha < 0) return Qt.rgba(a.r + (b.r - a.r) * t, a.g + (b.g - a.g) * t, a.b + (b.b - a.b) * t, 1)
+    var d = hb - ha
+    if (d > 0.5) d -= 1
+    else if (d < -0.5) d += 1
+    var h = ha + d * t
+    h = h - Math.floor(h)
+    return Qt.hsva(h, a.hsvSaturation + (b.hsvSaturation - a.hsvSaturation) * t, a.hsvValue + (b.hsvValue - a.hsvValue) * t, 1)
+  }
+
+  readonly property color cPrimary: Color.accent
+  readonly property color cSecondary: palette(["magenta", "color5", "bright_magenta", "color13"], Color.accent)
+  readonly property color cTertiary: palette(["cyan", "color6", "bright_cyan", "color14"], Color.accent)
+  readonly property color cHighlight: palette(["yellow", "color3", "bright_yellow", "color11"], Color.accent)
+  readonly property color cLive: palette(["green", "color2", "bright_green", "color10"], Color.accent)
+  // Panel fill: the theme's raised-surface colour when it names one, else a
+  // faint wash of the secondary hue (selection/color8 are often loud).
+  readonly property string surfaceKey: palette(["lighter_background", "lighter_bg"], "")
+  readonly property color cSurface: !themeColors ? Qt.rgba(1, 1, 1, 0.04)
+    : (surfaceKey !== "" ? Qt.alpha(surfaceKey, 0.45) : Qt.alpha(cSecondary, 0.07))
+
+  function parsePalette(text) {
+    var out = {}
+    var lines = String(text || "").split("\n")
+    for (var i = 0; i < lines.length; i++) {
+      var m = lines[i].match(/^\s*([A-Za-z0-9_]+)\s*=\s*["']?(#[0-9A-Fa-f]{6}(?:[0-9A-Fa-f]{2})?)["']?/)
+      if (m) out[m[1]] = m[2]
+    }
+    themePalette = out
+  }
+
+  FileView {
+    id: paletteFile
+    path: Color.currentThemePath + "/colors.toml"
+    watchChanges: true
+    onFileChanged: reload()
+    onLoaded: mprisRoot.parsePalette(text())
+  }
+
+  // A theme swap repoints the current/theme link rather than editing the
+  // file, which a watch may miss -- the accent changing is the reliable cue.
+  Connections {
+    target: Color
+    function onAccentChanged() { paletteFile.reload() }
+  }
 
   function applySavedSettings() {
     preferredPlayerIdentity = getSetting("preferredPlayerIdentity", "")
@@ -56,6 +125,7 @@ WidgetCard {
     spinRecord = getSetting("spinRecord", true)
     showLabelArt = getSetting("showLabelArt", true)
     lyricsFontScale = getSetting("lyricsFontScale", 1.0)
+    themeColors = getSetting("themeColors", true)
     var o = getSetting("lyricsOffsets", {})
     lyricsOffsets = (o && typeof o === "object") ? o : {}
   }
@@ -193,6 +263,28 @@ WidgetCard {
 
   function escapeHtml(t) {
     return String(t).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+  }
+
+  // Sung part of the karaoke line, shaded accent -> secondary by character
+  // position across the whole line (so the colour doesn't shift as it grows).
+  // Grouped into a few runs to keep the markup small.
+  function sweepHtml(sung, lineLength) {
+    if (!themeColors || sung.length === 0)
+      return "<font color=\"" + Color.accent + "\">" + escapeHtml(sung) + "</font>"
+    var runs = 8, out = ""
+    var step = Math.max(1, Math.ceil(lineLength / runs))
+    for (var i = 0; i < sung.length; i += step) {
+      var t = lineLength > 1 ? Math.min(1, (i + step / 2) / lineLength) : 0
+      out += "<font color=\"" + mixColor(cPrimary, cSecondary, t) + "\">" + escapeHtml(sung.slice(i, i + step)) + "</font>"
+    }
+    return out
+  }
+
+  // Visualizer bars sweep accent -> tertiary -> secondary, left to right.
+  function barColor(i) {
+    if (!themeColors) return Color.accent
+    var t = barCount > 1 ? i / (barCount - 1) : 0
+    return t < 0.5 ? mixColor(cPrimary, cTertiary, t * 2) : mixColor(cTertiary, cSecondary, (t - 0.5) * 2)
   }
 
   // 0..1 progress through the current line: runs from its timestamp to the
@@ -521,7 +613,8 @@ WidgetCard {
           { key: "showVisualizer", label: "Audio Spectrum Visualizer", icon: "" },
           { key: "showLyrics", label: "Lyrics Panel (wide sizes)", icon: "" },
           { key: "spinRecord", label: "Spinning Record", icon: String.fromCodePoint(0xf0cb9) },
-          { key: "showLabelArt", label: "Album Art on Record Label", icon: "\uf03e" }
+          { key: "showLabelArt", label: "Album Art on Record Label", icon: "\uf03e" },
+          { key: "themeColors", label: "Full Theme Palette", icon: String.fromCodePoint(0xf03d8) }
         ]
 
         Rectangle {
@@ -650,9 +743,18 @@ WidgetCard {
     opacity: available ? 1 : 0.35
     color: primary
       ? (ctrlMouse.containsMouse ? Color.accent : Qt.rgba(Color.accent.r, Color.accent.g, Color.accent.b, 0.85))
-      : (ctrlMouse.containsMouse && available ? Qt.rgba(1, 1, 1, 0.16) : Qt.rgba(1, 1, 1, 0.06))
-    border.color: primary ? Qt.rgba(1, 1, 1, 0.3) : (active ? Color.accent : Qt.rgba(1, 1, 1, 0.1))
+      : (ctrlMouse.containsMouse && available ? host.tint(host.cTertiary, 0.22) : Qt.rgba(1, 1, 1, 0.06))
+    border.color: primary ? Qt.rgba(1, 1, 1, 0.3) : (active ? Color.accent : (ctrlMouse.containsMouse && available ? host.tint(host.cTertiary, 0.6) : Qt.rgba(1, 1, 1, 0.1)))
     border.width: 1
+    // Play button blends accent into the secondary hue.
+    gradient: primary && host.themeColors ? playGradient : null
+
+    Gradient {
+      id: playGradient
+      orientation: Gradient.Horizontal
+      GradientStop { position: 0; color: ctrlMouse.containsMouse ? Qt.lighter(host.cPrimary, 1.15) : host.cPrimary }
+      GradientStop { position: 1; color: ctrlMouse.containsMouse ? Qt.lighter(host.cSecondary, 1.15) : host.cSecondary }
+    }
 
     Text {
       anchors.centerIn: parent
@@ -660,7 +762,7 @@ WidgetCard {
       text: ctrl.glyph
       font.family: Style.font.family
       font.pixelSize: host.sp(ctrl.primary ? 15 : 12)
-      color: ctrl.primary ? Color.background : (ctrl.active ? Color.accent : Color.foreground)
+      color: ctrl.primary ? Color.background : (ctrl.active ? Color.accent : (ctrlMouse.containsMouse && ctrl.available ? host.cTertiary : Color.foreground))
     }
 
     MouseArea {
@@ -726,7 +828,7 @@ WidgetCard {
         width: host.sp(6)
         height: width
         radius: width / 2
-        color: Color.accent
+        color: host.cLive
       }
     }
 
@@ -746,8 +848,8 @@ WidgetCard {
 
     Rectangle {
       radius: mprisRoot.sp(12)
-      color: Qt.rgba(1, 1, 1, 0.04)
-      border.color: Qt.rgba(1, 1, 1, 0.08)
+      color: mprisRoot.cSurface
+      border.color: mprisRoot.themeColors ? mprisRoot.tint(mprisRoot.cSecondary, 0.22) : Qt.rgba(1, 1, 1, 0.08)
       border.width: 1
 
       ColumnLayout {
@@ -763,7 +865,7 @@ WidgetCard {
             text: ""
             font.family: Style.font.family
             font.pixelSize: mprisRoot.sp(10)
-            color: Color.accent
+            color: mprisRoot.cSecondary
           }
           Text {
             text: "LYRICS"
@@ -806,7 +908,7 @@ WidgetCard {
                   font.family: Style.font.family
                   font.pixelSize: mprisRoot.sp(parent.isReadout ? 8 : 10)
                   font.weight: Font.Bold
-                  color: (parent.isReadout && mprisRoot.lyricsOffsetMs === 0) ? Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.35) : Color.accent
+                  color: (parent.isReadout && mprisRoot.lyricsOffsetMs === 0) ? Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.35) : (parent.isReadout ? mprisRoot.cHighlight : Color.accent)
                 }
 
                 MouseArea {
@@ -931,13 +1033,14 @@ WidgetCard {
               readonly property bool current: index === mprisRoot.currentLyricIndex
               readonly property bool past: mprisRoot.lyricsSynced && index < mprisRoot.currentLyricIndex
               width: ListView.view.width
-              // Current line sweeps sung characters into the accent colour.
+              // Current line sweeps sung characters into the accent colour,
+              // shading toward the secondary hue along the line.
               readonly property string lineText: modelData.text === "" ? "♪" : modelData.text
               textFormat: current ? Text.StyledText : Text.PlainText
               text: {
                 if (!current) return lineText
                 var n = Math.round(lineText.length * mprisRoot.currentLineProgress)
-                return "<font color=\"" + Color.accent + "\">" + mprisRoot.escapeHtml(lineText.slice(0, n)) + "</font>"
+                return mprisRoot.sweepHtml(lineText.slice(0, n), lineText.length)
                   + "<font color=\"" + Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.55) + "\">" + mprisRoot.escapeHtml(lineText.slice(n)) + "</font>"
               }
               wrapMode: Text.WordWrap
@@ -945,8 +1048,8 @@ WidgetCard {
               font.family: Style.font.family
               font.pixelSize: mprisRoot.sp((current ? 13 : 11) * mprisRoot.lyricsFontScale)
               font.weight: current ? Font.Bold : Font.Normal
-              color: Color.foreground
-              opacity: !mprisRoot.lyricsSynced ? 0.8 : (current ? 1.0 : (past ? 0.3 : 0.55))
+              color: past && mprisRoot.themeColors ? mprisRoot.cTertiary : Color.foreground
+              opacity: !mprisRoot.lyricsSynced ? 0.8 : (current ? 1.0 : (past ? 0.35 : 0.55))
               Behavior on opacity { NumberAnimation { duration: 200 } }
 
               // Click a synced line to jump there.
@@ -1020,13 +1123,18 @@ WidgetCard {
               id: vinylCanvas
               anchors.fill: parent
               property color stroke: Color.accent
+              property color stroke2: mprisRoot.cSecondary
+              property color stroke3: mprisRoot.cTertiary
               onStrokeChanged: requestPaint()
+              onStroke2Changed: requestPaint()
+              onStroke3Changed: requestPaint()
               onWidthChanged: requestPaint()
               onPaint: {
                 var ctx = getContext("2d")
                 var r = width / 2
                 var c = vinylCanvas.stroke
-                function rgba(a) { return "rgba(" + Math.round(c.r * 255) + "," + Math.round(c.g * 255) + "," + Math.round(c.b * 255) + "," + a + ")" }
+                function rgba(a, col) { var k = col || c; return "rgba(" + Math.round(k.r * 255) + "," + Math.round(k.g * 255) + "," + Math.round(k.b * 255) + "," + a + ")" }
+                var c2 = vinylCanvas.stroke2, c3 = vinylCanvas.stroke3
                 ctx.reset()
                 var lw = Math.max(1, r * 0.018)
                 // rim
@@ -1042,14 +1150,15 @@ WidgetCard {
                 }
                 // highlight arcs (rotate with the disc)
                 ctx.lineWidth = lw
-                ctx.strokeStyle = rgba(0.85)
+                ctx.strokeStyle = rgba(0.9, c2)
                 ctx.beginPath(); ctx.arc(r, r, r * 0.8, -0.35, 0.45); ctx.stroke()
+                ctx.strokeStyle = rgba(0.9, c3)
                 ctx.beginPath(); ctx.arc(r, r, r * 0.64, Math.PI - 0.3, Math.PI + 0.5); ctx.stroke()
-                ctx.strokeStyle = rgba(0.5)
+                ctx.strokeStyle = rgba(0.6, c2)
                 ctx.beginPath(); ctx.arc(r, r, r * 0.87, Math.PI * 0.55, Math.PI * 0.8); ctx.stroke()
                 // label ring
                 ctx.lineWidth = lw * 1.2
-                ctx.strokeStyle = rgba(0.95)
+                ctx.strokeStyle = rgba(0.95, c2)
                 ctx.beginPath(); ctx.arc(r, r, r * 0.42, 0, Math.PI * 2); ctx.stroke()
                 // spindle
                 ctx.lineWidth = Math.max(1, lw * 0.8)
@@ -1085,7 +1194,7 @@ WidgetCard {
               text: "\uf001"
               font.family: Style.font.family
               font.pixelSize: parent.width * 0.14
-              color: Color.accent
+              color: mprisRoot.cSecondary
               opacity: 0.9
             }
 
@@ -1146,7 +1255,7 @@ WidgetCard {
             text: mprisRoot.trackArtist
             font.family: Style.font.family
             font.pixelSize: mprisRoot.sp(12)
-            color: Color.accent
+            color: mprisRoot.cSecondary
             elide: Text.ElideRight
           }
 
@@ -1156,7 +1265,7 @@ WidgetCard {
             text: mprisRoot.trackAlbum
             font.family: Style.font.family
             font.pixelSize: mprisRoot.sp(10)
-            color: Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.55)
+            color: mprisRoot.themeColors ? mprisRoot.tint(mprisRoot.cTertiary, 0.8) : Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.55)
             elide: Text.ElideRight
           }
 
@@ -1171,7 +1280,7 @@ WidgetCard {
               text: mprisRoot.formatTime(mprisRoot.seeking ? mprisRoot.seekPreviewFrac * mprisRoot.lengthSec : mprisRoot.positionSec)
               font.family: Style.font.family
               font.pixelSize: mprisRoot.sp(9)
-              color: Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.6)
+              color: mprisRoot.themeColors ? mprisRoot.tint(mprisRoot.cTertiary, 0.75) : Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.6)
             }
 
             Rectangle {
@@ -1190,6 +1299,13 @@ WidgetCard {
                 width: parent.width * seekTrack.frac
                 radius: parent.radius
                 color: Color.accent
+                gradient: mprisRoot.themeColors ? seekGradient : null
+                Gradient {
+                  id: seekGradient
+                  orientation: Gradient.Horizontal
+                  GradientStop { position: 0; color: mprisRoot.cPrimary }
+                  GradientStop { position: 1; color: mprisRoot.cSecondary }
+                }
                 Behavior on width {
                   enabled: !mprisRoot.seeking
                   NumberAnimation { duration: 250 }
@@ -1203,7 +1319,7 @@ WidgetCard {
                 width: Math.max(9, mprisRoot.sp(11))
                 height: width
                 radius: width / 2
-                color: Color.accent
+                color: mprisRoot.themeColors ? mprisRoot.cHighlight : Color.accent
                 border.color: "#ffffff"
                 border.width: 1.5
               }
@@ -1235,7 +1351,7 @@ WidgetCard {
               text: mprisRoot.lengthSec > 0 ? mprisRoot.formatTime(mprisRoot.lengthSec) : "--:--"
               font.family: Style.font.family
               font.pixelSize: mprisRoot.sp(9)
-              color: Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.6)
+              color: mprisRoot.themeColors ? mprisRoot.tint(mprisRoot.cTertiary, 0.75) : Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.6)
             }
           }
 
@@ -1307,7 +1423,7 @@ WidgetCard {
               width: parent.barW
               height: Math.max(width, v * vizBox.height)
               radius: Math.min(width / 2, mprisRoot.sp(3))
-              color: Color.accent
+              color: mprisRoot.barColor(index)
               opacity: mprisRoot.isPlaying ? (0.45 + 0.5 * v) : 0.25
               Behavior on height { NumberAnimation { duration: 60 } }
             }
