@@ -47,6 +47,13 @@ for name, prof in (d.get("layout_profiles") or {}).items():
     if name == d.get("active_profile"):
         for k in ("positions", "enabled_widgets", "widget_settings", "monitor_positions", "monitor_enabled_widgets"):
             if k in d: prof[k] = d[k]
+    # Machine-local paths would point other users at files they don't have.
+    prof = json.loads(json.dumps(prof))
+    vp = (prof.get("widget_settings") or {}).get("video_player")
+    if isinstance(vp, dict): vp.pop("videoPath", None)
+    home = os.path.expanduser("~")
+    if home in json.dumps(prof):
+        sys.exit(f"sync: preset '{name}' still contains a path under {home}; strip it before publishing")
     fn = re.sub(r"[^A-Za-z0-9._-]+", "_", name) + ".json"
     json.dump({"version": "1.0", "type": "omarchy-desktop-widgets-profile", "profile": prof},
               open(os.path.join(out, fn), "w"), indent=2)

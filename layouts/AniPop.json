@@ -1,0 +1,260 @@
+{
+  "version": "1.0",
+  "type": "omarchy-desktop-widgets-profile",
+  "profile": {
+    "name": "AniPop",
+    "description": "Saved layout profile for AniPop",
+    "positions": {
+      "clock": {
+        "x": 1080,
+        "y": 80,
+        "w": 458,
+        "h": 226
+      },
+      "media": {
+        "x": 1380,
+        "y": 460,
+        "w": 380,
+        "h": 220
+      },
+      "rss_feed": {
+        "x": 2200,
+        "y": 840,
+        "w": 340,
+        "h": 460
+      },
+      "quick_notes": {
+        "x": 21,
+        "y": 523,
+        "w": 380,
+        "h": 440
+      },
+      "app_grid": {
+        "x": 20,
+        "y": 1000,
+        "w": 380,
+        "h": 220
+      },
+      "system_monitor": {
+        "x": 2180,
+        "y": 80,
+        "w": 360,
+        "h": 300
+      },
+      "system_about": {
+        "x": 2180,
+        "y": 420,
+        "w": 360,
+        "h": 380
+      },
+      "video_player": {
+        "x": 860,
+        "y": 960,
+        "w": 880,
+        "h": 460
+      },
+      "realm_portal": {
+        "x": 20,
+        "y": 1260,
+        "w": 380,
+        "h": 160
+      },
+      "mpris_player": {
+        "x": 20,
+        "y": 80,
+        "w": 380,
+        "h": 400
+      },
+      "horizon_clock": {
+        "x": 860,
+        "y": 80,
+        "w": 880,
+        "h": 280
+      },
+      "git_activity": {
+        "x": 2180,
+        "y": 840,
+        "w": 360,
+        "h": 540
+      }
+    },
+    "enabled_widgets": [
+      "system_monitor",
+      "app_grid",
+      "quick_notes",
+      "git_activity",
+      "horizon_clock",
+      "mpris_player",
+      "realm_portal",
+      "video_player",
+      "system_about"
+    ],
+    "widget_settings": {
+      "git_activity": {
+        "custom_repos": [
+          "https://github.com/DasPoxy/AniPop",
+          "https://github.com/gitcoder89431/ruixen-shell",
+          "https://github.com/cyelis1224/omarchy-desktop-widgets",
+          "https://github.com/HANCORE-linux/Shibumi-Shell/tree/main"
+        ],
+        "active_repo": "ALL"
+      },
+      "rss_feed": {
+        "activeFeedIndex": 4
+      },
+      "video_player": {
+        "volume": 0.8482700892857146,
+        "muted": false,
+        "hideWhenPaused": true
+      },
+      "clock": {
+        "is24Hour": false,
+        "showGreeting": false
+      },
+      "realm_portal": {
+        "shuffleIntervalMs": 5000,
+        "buttonText": "",
+        "swatchSlant": "straight",
+        "iconCodePoint": 61178,
+        "themeColors": true,
+        "buttonBlank": true
+      },
+      "mpris_player": {
+        "preferredPlayerIdentity": "Chromium",
+        "lyricsOffsets": {},
+        "lyricsFontScale": 1.75,
+        "showLyrics": true,
+        "themeColors": true
+      },
+      "app_grid": {
+        "pinnedApps": [
+          {
+            "name": "Aether",
+            "icon": "aether",
+            "exec": "aether",
+            "category": "System"
+          },
+          {
+            "name": "AisleRiot Solitaire",
+            "icon": "org.gnome.Aisleriot",
+            "exec": "/usr/bin/flatpak run --branch=stable --arch=x86_64 --command=sol org.gnome.Aisleriot",
+            "category": "Games"
+          },
+          {
+            "name": "BambuStudio",
+            "icon": "com.bambulab.BambuStudio",
+            "exec": "/usr/bin/flatpak run --branch=stable --arch=x86_64 --command=entrypoint --file-forwarding com.bambulab.BambuStudio @@u  @@",
+            "category": "Other"
+          },
+          {
+            "name": "Bazaar",
+            "icon": "io.github.kolunmi.Bazaar",
+            "exec": "bazaar-daemon",
+            "category": "Utilities"
+          },
+          {
+            "name": "Clank-My-Commander",
+            "icon": "applications-games",
+            "exec": "clank-my-commander",
+            "category": "Games"
+          },
+          {
+            "name": "Disks",
+            "icon": "org.gnome.DiskUtility",
+            "exec": "gnome-disks",
+            "category": "Utilities"
+          },
+          {
+            "name": "ProtonUp-Qt",
+            "icon": "net.davidotek.pupgui2",
+            "exec": "net.davidotek.pupgui2",
+            "category": "Games"
+          },
+          {
+            "name": "Shisen-Sho",
+            "icon": "kshisen",
+            "exec": "kshisen -qwindowtitle",
+            "category": "Games"
+          },
+          {
+            "name": "JDownloader",
+            "icon": "jdownloader",
+            "exec": "JDownloader",
+            "category": "Internet"
+          },
+          {
+            "name": "MakeMKV",
+            "icon": "com.makemkv.MakeMKV",
+            "exec": "/usr/bin/flatpak run --branch=stable --arch=x86_64 --command=makemkv com.makemkv.MakeMKV",
+            "category": "Media"
+          },
+          {
+            "name": "LocalSend",
+            "icon": "localsend",
+            "exec": "localsend",
+            "category": "Internet"
+          },
+          {
+            "name": "OBS Studio",
+            "icon": "com.obsproject.Studio",
+            "exec": "obs",
+            "category": "Media"
+          },
+          {
+            "name": "Omawrite",
+            "icon": "omawrite",
+            "exec": "omawrite",
+            "category": "Dev"
+          },
+          {
+            "name": "Pinta",
+            "icon": "com.github.PintaProject.Pinta",
+            "exec": "pinta",
+            "category": "Other"
+          },
+          {
+            "name": "Private Internet Access",
+            "icon": "piavpn",
+            "exec": "env XDG_SESSION_TYPE=X11 /opt/piavpn/bin/pia-client",
+            "category": "Internet"
+          },
+          {
+            "name": "Winetricks",
+            "icon": "winetricks",
+            "exec": "winetricks --gui",
+            "category": "Utilities"
+          },
+          {
+            "name": "Soundux",
+            "icon": "io.github.Soundux",
+            "exec": "/usr/bin/flatpak run --branch=stable --arch=x86_64 --command=soundux-startup --file-forwarding io.github.Soundux @@u  @@",
+            "category": "Media"
+          },
+          {
+            "name": "qBittorrent",
+            "icon": "qbittorrent",
+            "exec": "qbittorrent",
+            "category": "Internet"
+          }
+        ],
+        "gridCols": 5,
+        "themeColors": true
+      },
+      "horizon_clock": {
+        "useCelsius": false,
+        "is24Hour": false,
+        "showGreeting": false,
+        "compactDate": true
+      }
+    },
+    "monitor_positions": {},
+    "monitor_enabled_widgets": {},
+    "git_custom_repos": [
+      "https://github.com/DasPoxy/AniPop",
+      "https://github.com/gitcoder89431/ruixen-shell",
+      "https://github.com/cyelis1224/omarchy-desktop-widgets",
+      "https://github.com/HANCORE-linux/Shibumi-Shell/tree/main"
+    ],
+    "git_active_repo": "ALL"
+  }
+}
