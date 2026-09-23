@@ -30,8 +30,24 @@ WidgetCard {
   property int pollIntervalMs: 30000
   readonly property bool hasData: Object.keys(info).length > 0
 
+  // Full Theme Palette: each section's icons and heading take their own
+  // theme hue (hardware cyan, software magenta, uptime green).
+  // Off = accent-only.
+  property bool themeColors: true
+
+  ThemePalette {
+    id: pal
+    active: aboutWidgetRoot.themeColors
+  }
+
+  function toggleSetting(key) {
+    aboutWidgetRoot[key] = !aboutWidgetRoot[key]
+    aboutWidgetRoot.saveSetting(key, aboutWidgetRoot[key])
+  }
+
   function applySavedSettings() {
     pollIntervalMs = getSetting("pollIntervalMs", 30000)
+    themeColors = getSetting("themeColors", true)
   }
 
   onSettingsLoaded: applySavedSettings()
@@ -121,6 +137,8 @@ WidgetCard {
 
     ColumnLayout {
       required property var modelData
+      // Section hue, from the enclosing GridLayout (see sectionHue below).
+      readonly property color hue: parent && parent.sectionHue !== undefined ? parent.sectionHue : Color.accent
       Layout.fillWidth: true
       spacing: 0
 
@@ -132,7 +150,7 @@ WidgetCard {
           text: modelData.icon
           font.family: Style.font.family
           font.pixelSize: 9
-          color: Color.accent
+          color: hue
         }
 
         Text {
@@ -199,6 +217,51 @@ WidgetCard {
             aboutWidgetRoot.refreshNow()
             aboutWidgetRoot.contextMenuOpen = false
           }
+        }
+      }
+
+      // Full theme palette toggle
+      Rectangle {
+        Layout.fillWidth: true
+        implicitHeight: 28
+        radius: 6
+        color: themeToggleMouse.containsMouse ? Qt.rgba(Color.accent.r, Color.accent.g, Color.accent.b, 0.2) : "transparent"
+
+        RowLayout {
+          anchors.fill: parent
+          anchors.leftMargin: Style.space(8)
+          anchors.rightMargin: Style.space(8)
+          spacing: Style.space(8)
+
+          Text {
+            text: String.fromCodePoint(0xf03d8) // md-palette
+            font.family: Style.font.family
+            font.pixelSize: 11
+            color: aboutWidgetRoot.themeColors ? Color.accent : Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.5)
+          }
+
+          Text {
+            Layout.fillWidth: true
+            text: "Full Theme Palette"
+            font.family: Style.font.family
+            font.pixelSize: 11
+            color: Color.foreground
+          }
+
+          Text {
+            text: aboutWidgetRoot.themeColors ? "\uf14a" : "\uf096"
+            font.family: Style.font.family
+            font.pixelSize: 12
+            color: aboutWidgetRoot.themeColors ? Color.accent : Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.4)
+          }
+        }
+
+        MouseArea {
+          id: themeToggleMouse
+          anchors.fill: parent
+          hoverEnabled: true
+          cursorShape: Qt.PointingHandCursor
+          onClicked: aboutWidgetRoot.toggleSetting("themeColors")
         }
       }
     }
@@ -359,7 +422,7 @@ WidgetCard {
     Rectangle {
       Layout.fillWidth: true
       height: 1
-      color: Qt.rgba(1, 1, 1, 0.08)
+      color: pal.line
     }
 
     Text {
@@ -399,10 +462,11 @@ WidgetCard {
             font.family: Style.font.family
             font.pixelSize: 8
             font.weight: Font.Bold
-            color: Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.45)
+            color: aboutWidgetRoot.themeColors ? pal.tint(pal.tertiary, 0.75) : Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.45)
           }
 
           GridLayout {
+            readonly property color sectionHue: pal.tertiary
             Layout.fillWidth: true
             columns: 2
             columnSpacing: Style.space(14)
@@ -426,10 +490,11 @@ WidgetCard {
             font.family: Style.font.family
             font.pixelSize: 8
             font.weight: Font.Bold
-            color: Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.45)
+            color: aboutWidgetRoot.themeColors ? pal.tint(pal.secondary, 0.75) : Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.45)
           }
 
           GridLayout {
+            readonly property color sectionHue: pal.secondary
             Layout.fillWidth: true
             columns: 2
             columnSpacing: Style.space(14)
@@ -453,10 +518,11 @@ WidgetCard {
             font.family: Style.font.family
             font.pixelSize: 8
             font.weight: Font.Bold
-            color: Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.45)
+            color: aboutWidgetRoot.themeColors ? pal.tint(pal.live, 0.75) : Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.45)
           }
 
           GridLayout {
+            readonly property color sectionHue: pal.live
             Layout.fillWidth: true
             columns: 2
             columnSpacing: Style.space(14)

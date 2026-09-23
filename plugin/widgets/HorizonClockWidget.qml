@@ -45,6 +45,30 @@ WidgetCard {
   property bool useCelsius: false
   property string fontFamily: "" // "" = theme font
 
+  // Full Theme Palette: greeting magenta, weather icon yellow, date cyan,
+  // and the time itself shaded accent -> magenta digit by digit.
+  // Off = accent-only.
+  property bool themeColors: true
+
+  ThemePalette {
+    id: pal
+    active: horizonRoot.themeColors
+  }
+
+  function escapeHtml(t) {
+    return String(t).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+  }
+  // Per-character accent -> secondary sweep (colour-only markup, so the
+  // hidden plain-text measuring copies still give the same width).
+  function sweepHtml(str) {
+    var out = ""
+    for (var i = 0; i < str.length; i++) {
+      var t = str.length > 1 ? i / (str.length - 1) : 0
+      out += "<font color=\"" + pal.mixColor(pal.primary, pal.secondary, t) + "\">" + escapeHtml(str.charAt(i)) + "</font>"
+    }
+    return out
+  }
+
   function applySavedSettings() {
     is24Hour = getSetting("is24Hour", true)
     showSeconds = getSetting("showSeconds", false)
@@ -53,6 +77,7 @@ WidgetCard {
     compactDate = getSetting("compactDate", false)
     useCelsius = getSetting("useCelsius", false)
     fontFamily = getSetting("fontFamily", "")
+    themeColors = getSetting("themeColors", true)
   }
 
   onSettingsLoaded: applySavedSettings()
@@ -304,6 +329,7 @@ WidgetCard {
         onClicked: horizonRoot.toggleSetting("useCelsius")
       }
       ToggleRow { host: horizonRoot; glyph: ""; label: "Show Greeting Message"; checked: horizonRoot.showGreeting; onClicked: horizonRoot.toggleSetting("showGreeting") }
+      ToggleRow { host: horizonRoot; glyph: String.fromCodePoint(0xf03d8); label: "Full Theme Palette"; checked: horizonRoot.themeColors; onClicked: horizonRoot.toggleSetting("themeColors") }
       ToggleRow {
         host: horizonRoot
         glyph: ""
@@ -529,7 +555,7 @@ WidgetCard {
       font.family: horizonRoot.activeFont
       font.pixelSize: horizonRoot.px(horizonRoot.baseGreeting)
       font.weight: Font.DemiBold
-      color: Color.accent
+      color: pal.secondary
       opacity: 0.95
       style: Text.Outline
       styleColor: Qt.rgba(0, 0, 0, 0.75)
@@ -545,8 +571,8 @@ WidgetCard {
       Rectangle {
         anchors.fill: parent
         radius: 8 * horizonRoot.fitScale
-        color: weatherHover.containsMouse ? Qt.rgba(Color.accent.r, Color.accent.g, Color.accent.b, 0.22) : "transparent"
-        border.color: weatherHover.containsMouse ? Qt.rgba(Color.accent.r, Color.accent.g, Color.accent.b, 0.45) : "transparent"
+        color: weatherHover.containsMouse ? pal.tint(pal.highlight, 0.22) : "transparent"
+        border.color: weatherHover.containsMouse ? pal.tint(pal.highlight, 0.45) : "transparent"
         border.width: 1
         Behavior on color { ColorAnimation { duration: 150 } }
         Behavior on border.color { ColorAnimation { duration: 150 } }
@@ -561,7 +587,7 @@ WidgetCard {
           text: horizonRoot.weatherIcon
           font.family: horizonRoot.activeFont
           font.pixelSize: horizonRoot.px(horizonRoot.baseWeatherIcon)
-          color: Color.accent
+          color: pal.highlight
           opacity: 0.9
           style: Text.Outline
           styleColor: Qt.rgba(0, 0, 0, 0.75)
@@ -589,7 +615,8 @@ WidgetCard {
 
     Text {
       Layout.alignment: Qt.AlignHCenter
-      text: horizonRoot.timeString
+      textFormat: horizonRoot.themeColors ? Text.StyledText : Text.PlainText
+      text: horizonRoot.themeColors ? horizonRoot.sweepHtml(horizonRoot.timeString) : horizonRoot.timeString
       font.family: horizonRoot.activeFont
       font.pixelSize: horizonRoot.px(horizonRoot.baseTime)
       font.weight: Font.Bold
@@ -605,7 +632,7 @@ WidgetCard {
       font.family: horizonRoot.activeFont
       font.pixelSize: horizonRoot.px(horizonRoot.baseDate)
       font.weight: Font.Medium
-      color: Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.85)
+      color: horizonRoot.themeColors ? pal.tint(pal.tertiary, 0.9) : Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.85)
       style: Text.Outline
       styleColor: Qt.rgba(0, 0, 0, 0.75)
     }

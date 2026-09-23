@@ -35,7 +35,31 @@ WidgetCard {
   property real tileMenuX: 0
   property real tileMenuY: 0
 
+  // Full Theme Palette: tiles sweep accent -> cyan -> magenta across the
+  // grid (hover wash, border, name), like the Karaoke visualizer bars.
+  // Off = accent-only.
+  property bool themeColors: true
+
+  ThemePalette {
+    id: pal
+    active: gridWidgetRoot.themeColors
+  }
+
+  function toggleSetting(key) {
+    gridWidgetRoot[key] = !gridWidgetRoot[key]
+    gridWidgetRoot.saveSetting(key, gridWidgetRoot[key])
+  }
+
+  // Hue for the tile at grid position i (row-major, diagonal sweep).
+  function tileHue(i) {
+    if (!gridWidgetRoot.themeColors) return Color.accent
+    var n = gridWidgetRoot.gridCols
+    var t = n > 1 ? ((i % n) + Math.floor(i / n)) / (2 * (n - 1)) : 0
+    return t < 0.5 ? pal.mixColor(pal.primary, pal.tertiary, t * 2) : pal.mixColor(pal.tertiary, pal.secondary, (t - 0.5) * 2)
+  }
+
   function applySavedSettings() {
+    themeColors = getSetting("themeColors", true)
     var pinned = getSetting("pinnedApps", undefined)
     if (Array.isArray(pinned)) gridWidgetRoot.pinnedApps = pinned
     var cols = getSetting("gridCols", 4)
@@ -285,6 +309,51 @@ WidgetCard {
         }
       }
 
+      // Full theme palette toggle
+      Rectangle {
+        Layout.fillWidth: true
+        implicitHeight: 28
+        radius: 6
+        color: themeToggleMouse.containsMouse ? Qt.rgba(Color.accent.r, Color.accent.g, Color.accent.b, 0.2) : "transparent"
+
+        RowLayout {
+          anchors.fill: parent
+          anchors.leftMargin: Style.space(8)
+          anchors.rightMargin: Style.space(8)
+          spacing: Style.space(8)
+
+          Text {
+            text: String.fromCodePoint(0xf03d8) // md-palette
+            font.family: Style.font.family
+            font.pixelSize: 11
+            color: gridWidgetRoot.themeColors ? Color.accent : Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.5)
+          }
+
+          Text {
+            Layout.fillWidth: true
+            text: "Full Theme Palette"
+            font.family: Style.font.family
+            font.pixelSize: 11
+            color: Color.foreground
+          }
+
+          Text {
+            text: gridWidgetRoot.themeColors ? "\uf14a" : "\uf096"
+            font.family: Style.font.family
+            font.pixelSize: 12
+            color: gridWidgetRoot.themeColors ? Color.accent : Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.4)
+          }
+        }
+
+        MouseArea {
+          id: themeToggleMouse
+          anchors.fill: parent
+          hoverEnabled: true
+          cursorShape: Qt.PointingHandCursor
+          onClicked: gridWidgetRoot.toggleSetting("themeColors")
+        }
+      }
+
       Text {
         Layout.fillWidth: true
         Layout.topMargin: 2
@@ -445,7 +514,7 @@ WidgetCard {
     Rectangle {
       Layout.fillWidth: true
       height: 1
-      color: Qt.rgba(1, 1, 1, 0.08)
+      color: pal.line
     }
 
     // ---------------------------------------------------------------------
@@ -474,6 +543,7 @@ WidgetCard {
           id: tileRoot
           required property var modelData
           required property int index
+          readonly property color hue: gridWidgetRoot.tileHue(index)
           width: appGridView.cellWidth
           height: appGridView.cellHeight
 
@@ -482,10 +552,11 @@ WidgetCard {
             anchors.margins: 3
             radius: 12
             color: modelData.__add
-              ? (addTileMouse.containsMouse ? Qt.rgba(Color.accent.r, Color.accent.g, Color.accent.b, 0.18) : Qt.rgba(1, 1, 1, 0.03))
-              : (tileMouse.containsMouse ? Qt.rgba(1, 1, 1, 0.12) : Qt.rgba(1, 1, 1, 0.03))
-            border.color: modelData.__add ? Qt.rgba(Color.accent.r, Color.accent.g, Color.accent.b, 0.4) : "transparent"
-            border.width: modelData.__add ? 1 : 0
+              ? (addTileMouse.containsMouse ? pal.tint(tileRoot.hue, 0.18) : Qt.rgba(1, 1, 1, 0.03))
+              : (tileMouse.containsMouse ? (gridWidgetRoot.themeColors ? pal.tint(tileRoot.hue, 0.16) : Qt.rgba(1, 1, 1, 0.12)) : Qt.rgba(1, 1, 1, 0.03))
+            border.color: modelData.__add ? pal.tint(tileRoot.hue, 0.4)
+              : (gridWidgetRoot.themeColors && tileMouse.containsMouse ? pal.tint(tileRoot.hue, 0.45) : "transparent")
+            border.width: modelData.__add || (gridWidgetRoot.themeColors && tileMouse.containsMouse) ? 1 : 0
 
             scale: (modelData.__add ? addTileMouse.pressed : tileMouse.pressed) ? 0.94
               : ((modelData.__add ? addTileMouse.containsMouse : tileMouse.containsMouse) ? 1.03 : 1.0)
@@ -504,7 +575,7 @@ WidgetCard {
                 text: ""
                 font.family: Style.font.family
                 font.pixelSize: 20
-                color: Color.accent
+                color: tileRoot.hue
               }
               Text {
                 Layout.alignment: Qt.AlignHCenter
@@ -542,7 +613,7 @@ WidgetCard {
                   text: gridWidgetRoot.getCategoryIcon(modelData.category)
                   font.family: Style.font.family
                   font.pixelSize: 18
-                  color: Color.accent
+                  color: tileRoot.hue
                 }
               }
 
@@ -553,7 +624,7 @@ WidgetCard {
                 font.family: Style.font.family
                 font.pixelSize: 9
                 font.weight: Font.DemiBold
-                color: tileMouse.containsMouse ? Color.accent : Color.foreground
+                color: tileMouse.containsMouse ? tileRoot.hue : Color.foreground
                 horizontalAlignment: Text.AlignHCenter
                 elide: Text.ElideRight
                 maximumLineCount: 1
