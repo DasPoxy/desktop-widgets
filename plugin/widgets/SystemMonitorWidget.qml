@@ -99,9 +99,25 @@ WidgetCard {
     onTriggered: monWidgetRoot.refreshAgents()
   }
 
+  // Full Theme Palette: each meter gets its own theme hue (CPU tertiary,
+  // RAM secondary, GPU green) with an accent -> hue fill, and the
+  // 70%/90% warnings use the theme's yellow/red. Off = accent-only.
+  property bool themeColors: true
+
+  ThemePalette {
+    id: pal
+    active: monWidgetRoot.themeColors
+  }
+
+  function toggleSetting(key) {
+    monWidgetRoot[key] = !monWidgetRoot[key]
+    monWidgetRoot.saveSetting(key, monWidgetRoot[key])
+  }
+
   function applySavedSettings() {
     pollIntervalMs = getSetting("pollIntervalMs", 2000)
     showAgents = getSetting("showAgents", true)
+    themeColors = getSetting("themeColors", true)
   }
 
   function setPollInterval(ms) {
@@ -113,10 +129,14 @@ WidgetCard {
   onRootRefChanged: applySavedSettings()
   Component.onCompleted: applySavedSettings()
 
-  function barColor(pct) {
-    if (pct >= 90) return Color.urgent
-    if (pct >= 70) return "#f59e0b"
-    return Color.accent
+  function barColor(pct, hue) {
+    if (pct >= 90) return pal.danger
+    if (pct >= 70) return monWidgetRoot.themeColors ? pal.highlight : "#f59e0b"
+    return hue !== undefined ? hue : Color.accent
+  }
+  // Below the warning band a themed bar blends accent -> the meter's hue.
+  function barGradient(pct) {
+    return monWidgetRoot.themeColors && pct < 70
   }
 
   readonly property string sysmonScriptPath: {
@@ -319,6 +339,51 @@ WidgetCard {
           onClicked: monWidgetRoot.setShowAgents(!monWidgetRoot.showAgents)
         }
       }
+
+      // Full theme palette toggle
+      Rectangle {
+        Layout.fillWidth: true
+        implicitHeight: 28
+        radius: 6
+        color: themeToggleMouse.containsMouse ? Qt.rgba(Color.accent.r, Color.accent.g, Color.accent.b, 0.2) : "transparent"
+
+        RowLayout {
+          anchors.fill: parent
+          anchors.leftMargin: Style.space(8)
+          anchors.rightMargin: Style.space(8)
+          spacing: Style.space(8)
+
+          Text {
+            text: String.fromCodePoint(0xf03d8) // md-palette
+            font.family: Style.font.family
+            font.pixelSize: 11
+            color: monWidgetRoot.themeColors ? Color.accent : Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.5)
+          }
+
+          Text {
+            Layout.fillWidth: true
+            text: "Full Theme Palette"
+            font.family: Style.font.family
+            font.pixelSize: 11
+            color: Color.foreground
+          }
+
+          Text {
+            text: monWidgetRoot.themeColors ? "\uf14a" : "\uf096"
+            font.family: Style.font.family
+            font.pixelSize: 12
+            color: monWidgetRoot.themeColors ? Color.accent : Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.4)
+          }
+        }
+
+        MouseArea {
+          id: themeToggleMouse
+          anchors.fill: parent
+          hoverEnabled: true
+          cursorShape: Qt.PointingHandCursor
+          onClicked: monWidgetRoot.toggleSetting("themeColors")
+        }
+      }
     }
   }
 
@@ -357,7 +422,7 @@ WidgetCard {
         width: 7
         height: 7
         radius: 3.5
-        color: Color.accent
+        color: pal.live
       }
 
       Text {
@@ -452,7 +517,7 @@ WidgetCard {
     Rectangle {
       Layout.fillWidth: true
       height: 1
-      color: Qt.rgba(1, 1, 1, 0.08)
+      color: pal.line
     }
 
     // CPU Meter
@@ -468,7 +533,7 @@ WidgetCard {
           text: ""
           font.family: Style.font.family
           font.pixelSize: 11
-          color: Color.accent
+          color: pal.tertiary
           Layout.preferredWidth: 16
         }
         Text {
@@ -497,7 +562,14 @@ WidgetCard {
           height: parent.height
           width: Math.max(0, Math.min(parent.width, parent.width * monWidgetRoot.cpuPct / 100))
           radius: 3.5
-          color: monWidgetRoot.barColor(monWidgetRoot.cpuPct)
+          color: monWidgetRoot.barColor(monWidgetRoot.cpuPct, pal.tertiary)
+          gradient: monWidgetRoot.barGradient(monWidgetRoot.cpuPct) ? cpuFillGradient : null
+          Gradient {
+            id: cpuFillGradient
+            orientation: Gradient.Horizontal
+            GradientStop { position: 0; color: pal.primary }
+            GradientStop { position: 1; color: pal.tertiary }
+          }
           Behavior on width { NumberAnimation { duration: 400; easing.type: Easing.OutCubic } }
         }
       }
@@ -517,7 +589,7 @@ WidgetCard {
           text: String.fromCodePoint(0xf035b) // md-memory (fa-memory is absent from this font)
           font.family: Style.font.family
           font.pixelSize: 11
-          color: Color.accent
+          color: pal.secondary
           Layout.preferredWidth: 16
         }
         Text {
@@ -553,7 +625,14 @@ WidgetCard {
           height: parent.height
           width: Math.max(0, Math.min(parent.width, parent.width * pct / 100))
           radius: 3.5
-          color: monWidgetRoot.barColor(pct)
+          color: monWidgetRoot.barColor(pct, pal.secondary)
+          gradient: monWidgetRoot.barGradient(pct) ? ramFillGradient : null
+          Gradient {
+            id: ramFillGradient
+            orientation: Gradient.Horizontal
+            GradientStop { position: 0; color: pal.primary }
+            GradientStop { position: 1; color: pal.secondary }
+          }
           Behavior on width { NumberAnimation { duration: 400; easing.type: Easing.OutCubic } }
         }
       }
@@ -576,7 +655,7 @@ WidgetCard {
             text: ""
             font.family: Style.font.family
             font.pixelSize: 11
-            color: Color.accent
+            color: pal.live
             Layout.preferredWidth: 16
           }
           Text {
@@ -613,7 +692,14 @@ WidgetCard {
             height: parent.height
             width: Math.max(0, Math.min(parent.width, parent.width * modelData.pct / 100))
             radius: 3.5
-            color: monWidgetRoot.barColor(modelData.pct)
+            color: monWidgetRoot.barColor(modelData.pct, pal.live)
+            gradient: monWidgetRoot.barGradient(modelData.pct) ? gpuFillGradient : null
+            Gradient {
+              id: gpuFillGradient
+              orientation: Gradient.Horizontal
+              GradientStop { position: 0; color: pal.primary }
+              GradientStop { position: 1; color: pal.live }
+            }
             Behavior on width { NumberAnimation { duration: 400; easing.type: Easing.OutCubic } }
           }
         }
@@ -624,7 +710,7 @@ WidgetCard {
     Rectangle {
       Layout.fillWidth: true
       height: 1
-      color: Qt.rgba(1, 1, 1, 0.08)
+      color: pal.line
     }
 
     // Bottom row: network readings, with agent usage bars to their right
@@ -647,7 +733,7 @@ WidgetCard {
           text: ""
           font.family: Style.font.family
           font.pixelSize: 11
-          color: Color.accent
+          color: pal.tertiary
         }
         Text {
           text: "NETWORK"
@@ -675,7 +761,7 @@ WidgetCard {
             text: ""
             font.family: Style.font.family
             font.pixelSize: 10
-            color: "#10b981"
+            color: monWidgetRoot.themeColors ? pal.live : "#10b981"
           }
           Text {
             text: monWidgetRoot.network ? monWidgetRoot.network.down_rate : "0 B/s"
@@ -692,7 +778,7 @@ WidgetCard {
             text: ""
             font.family: Style.font.family
             font.pixelSize: 10
-            color: "#f59e0b"
+            color: monWidgetRoot.themeColors ? pal.highlight : "#f59e0b"
           }
           Text {
             text: monWidgetRoot.network ? monWidgetRoot.network.up_rate : "0 B/s"
@@ -746,7 +832,7 @@ WidgetCard {
       visible: monWidgetRoot.agentsVisible && monWidgetRoot.network !== null
       Layout.fillHeight: true
       implicitWidth: 1
-      color: Qt.rgba(1, 1, 1, 0.08)
+      color: pal.line
     }
 
     // Agent Usage Section
@@ -765,7 +851,7 @@ WidgetCard {
           text: String.fromCodePoint(0xf06a9) // md-robot
           font.family: Style.font.family
           font.pixelSize: 11
-          color: Color.accent
+          color: pal.secondary
         }
         Text {
           text: "AGENTS"
@@ -827,7 +913,14 @@ WidgetCard {
                   height: parent.height
                   width: Math.max(0, Math.min(parent.width, parent.width * limitRow.pct / 100))
                   radius: 2.5
-                  color: monWidgetRoot.barColor(limitRow.pct)
+                  color: monWidgetRoot.barColor(limitRow.pct, pal.secondary)
+                  gradient: monWidgetRoot.barGradient(limitRow.pct) ? agentFillGradient : null
+                  Gradient {
+                    id: agentFillGradient
+                    orientation: Gradient.Horizontal
+                    GradientStop { position: 0; color: pal.primary }
+                    GradientStop { position: 1; color: pal.secondary }
+                  }
                   Behavior on width { NumberAnimation { duration: 400; easing.type: Easing.OutCubic } }
                 }
               }

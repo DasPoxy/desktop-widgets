@@ -239,7 +239,23 @@ WidgetCard {
     }
   }
 
+  // Full Theme Palette: the two header glyphs take the theme's secondary /
+  // tertiary hues, the portal gets an accent -> secondary wash and the
+  // status line picks up the theme's own green/red. Off = accent-only.
+  property bool themeColors: true
+
+  ThemePalette {
+    id: pal
+    active: realmWidgetRoot.themeColors
+  }
+
+  function toggleSetting(key) {
+    realmWidgetRoot[key] = !realmWidgetRoot[key]
+    realmWidgetRoot.saveSetting(key, realmWidgetRoot[key])
+  }
+
   function applySavedSettings() {
+    realmWidgetRoot.themeColors = getSetting("themeColors", true)
     realmWidgetRoot.iconCodePoint = getSetting("iconCodePoint", 0xeefa)
     realmWidgetRoot.shuffleIntervalMs = getSetting("shuffleIntervalMs", 5000)
     realmWidgetRoot.swatchSlant = getSetting("swatchSlant", "left")
@@ -617,6 +633,52 @@ WidgetCard {
         }
       }
 
+      // Full theme palette toggle
+      Rectangle {
+        Layout.fillWidth: true
+        Layout.topMargin: 4
+        implicitHeight: 28
+        radius: 6
+        color: themeToggleMouse.containsMouse ? Qt.rgba(Color.accent.r, Color.accent.g, Color.accent.b, 0.2) : "transparent"
+
+        RowLayout {
+          anchors.fill: parent
+          anchors.leftMargin: Style.space(8)
+          anchors.rightMargin: Style.space(8)
+          spacing: Style.space(8)
+
+          Text {
+            text: String.fromCodePoint(0xf03d8) // md-palette
+            font.family: Style.font.family
+            font.pixelSize: 11
+            color: realmWidgetRoot.themeColors ? Color.accent : Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.5)
+          }
+
+          Text {
+            Layout.fillWidth: true
+            text: "Full Theme Palette"
+            font.family: Style.font.family
+            font.pixelSize: 11
+            color: Color.foreground
+          }
+
+          Text {
+            text: realmWidgetRoot.themeColors ? "\uf14a" : "\uf096"
+            font.family: Style.font.family
+            font.pixelSize: 12
+            color: realmWidgetRoot.themeColors ? Color.accent : Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.4)
+          }
+        }
+
+        MouseArea {
+          id: themeToggleMouse
+          anchors.fill: parent
+          hoverEnabled: true
+          cursorShape: Qt.PointingHandCursor
+          onClicked: realmWidgetRoot.toggleSetting("themeColors")
+        }
+      }
+
       Text {
         text: "EXCLUDED GAMES"
         font.family: Style.font.family
@@ -861,7 +923,7 @@ WidgetCard {
         text: realmWidgetRoot.iconGlyph
         font.family: Style.font.family
         font.pixelSize: 14
-        color: Color.accent
+        color: pal.secondary
 
         transform: Scale {
           origin.x: realmLeftIcon.width / 2
@@ -886,7 +948,7 @@ WidgetCard {
         text: realmWidgetRoot.iconGlyph
         font.family: Style.font.family
         font.pixelSize: 14
-        color: Color.accent
+        color: pal.tertiary
 
         // A bare "on rotation" animation halts mid-loop at whatever angle it
         // was at when launching flips false -- it does not snap back to 0.
@@ -996,6 +1058,18 @@ WidgetCard {
         ? "transparent"
         : (portalMouse.containsMouse && !realmWidgetRoot.launching ? Qt.rgba(Color.accent.r, Color.accent.g, Color.accent.b, 0.18) : "transparent")
       border.color: Color.accent
+
+      // Themed hover (no cover art): accent -> secondary wash.
+      Rectangle {
+        anchors.fill: parent
+        visible: realmWidgetRoot.themeColors && realmWidgetRoot.swatchImages.length === 0
+          && portalMouse.containsMouse && !realmWidgetRoot.launching
+        gradient: Gradient {
+          orientation: Gradient.Horizontal
+          GradientStop { position: 0; color: pal.tint(pal.primary, 0.2) }
+          GradientStop { position: 1; color: pal.tint(pal.secondary, 0.2) }
+        }
+      }
       border.width: 2
       opacity: realmWidgetRoot.launching ? 0.7 : 1.0
 
@@ -1055,6 +1129,16 @@ WidgetCard {
         color: Qt.rgba(0, 0, 0, 0.5)
       }
 
+      Rectangle {
+        anchors.fill: parent
+        visible: realmWidgetRoot.themeColors && realmWidgetRoot.swatchImages.length > 0
+        gradient: Gradient {
+          orientation: Gradient.Horizontal
+          GradientStop { position: 0; color: pal.tint(pal.primary, portalMouse.containsMouse ? 0.26 : 0.16) }
+          GradientStop { position: 1; color: pal.tint(pal.secondary, portalMouse.containsMouse ? 0.26 : 0.16) }
+        }
+      }
+
       Text {
         anchors.centerIn: parent
         text: realmWidgetRoot.launching ? "Opening portal..." : (realmWidgetRoot.buttonText || realmWidgetRoot.defaultButtonText)
@@ -1085,7 +1169,8 @@ WidgetCard {
       font.pixelSize: 10
       wrapMode: Text.WordWrap
       horizontalAlignment: Text.AlignHCenter
-      color: realmWidgetRoot.statusIsError ? Color.urgent : Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.7)
+      color: realmWidgetRoot.statusIsError ? pal.danger
+        : (realmWidgetRoot.themeColors ? pal.tint(pal.live, 0.85) : Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.7))
     }
   }
 }
