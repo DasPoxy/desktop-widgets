@@ -27,6 +27,26 @@ Edits to upstream files (in `patches/upstream-edits.patch`, full copies in
 
 ## Install / restore
 
+### One-line install
+
+```sh
+bash <(curl -fsSL https://raw.githubusercontent.com/DasPoxy/desktop-widgets/main/bootstrap.sh)
+```
+
+This checks that [dagyr.desktop-widgets](https://github.com/cyelis1224/omarchy-desktop-widgets)
+is installed and stops with a link to it if it isn't. Otherwise it clones this
+repo to `~/.local/share/desktop-widgets` (or pulls it if it's already there)
+and runs `install.sh` from it. Then reload the shell (step 3 below). Re-run the
+same line to update.
+
+While this repo is private, `curl` can't reach it; use the GitHub CLI instead:
+
+```sh
+bash <(gh api -H 'Accept: application/vnd.github.raw' repos/DasPoxy/desktop-widgets/contents/bootstrap.sh)
+```
+
+### Manual
+
 1. Install the upstream plugin first. `UPSTREAM` records the repo and commit
    these were built on.
 2. Run `./install.sh`. It copies the new files in. For the two edited upstream
