@@ -12,7 +12,7 @@ overlay: only the files that are new or changed relative to upstream.
 | --- | --- | --- |
 | **Horizon Clock & Weather** | `HorizonClockWidget.qml` | Fork of Hero Clock & Weather that's resizable: greeting, weather, time and date scale together to fit centred in whatever size the card is dragged to (160×80 up to wall-sized). Right-click to pick any installed Nerd Font (searchable, previewed in-font), plus Hero's 12/24h, seconds, compact date, °F/°C and greeting options. |
 | **Karaoke Player** | `MprisPlayerWidget.qml` + `get-lyrics.sh`, `get-mute.sh` | Wireframe spinning-record player for any MPRIS source. Seekable progress, prev/play/next, live cava spectrum, source chips (scroll to cycle), synced karaoke-style lyrics from a local `.lrc` or LRCLIB, beside or below the controls. Per-track timing nudge, lyric size S–XXL. Space/M hotkeys on hover (M mutes that app's own audio stream). Scales from 260×150 to wall-sized. |
-| **Video Player** | `VideoPlayerWidget.qml` + `get-video.sh`, `get-youtube.sh` | Loops a local video, or a YouTube URL downloaded via yt-dlp to a cache. Volume/mute, scroll-wheel scrubbing, Space/M hotkeys on hover, double-click fullscreen. |
+| **Video Player** | `VideoPlayerWidget.qml` + `get-video.sh`, `get-youtube.sh` | Loops a local video, or a YouTube URL downloaded via yt-dlp to a cache. Volume/mute, scroll-wheel scrubbing, Space/M hotkeys on hover, double-click fullscreen. Optional *Hide While Paused*: the widget fades out while paused and back in on hover. |
 | **Visit Another Realm** | `RealmPortalWidget.qml` + `get-random-game.sh` | One button launches a random installed game from Steam, Heroic or Lutris, over shuffling cover-art swatches (angle: ╲ │ ╱). Custom title/button text, icon picker, per-game exclusion list. |
 | **System Monitor** | `SystemMonitorWidget.qml` + `get-sysmon.sh`, `get-agents.sh` | CPU/RAM/GPU meters, network rates and session totals, and AI agent usage-limit bars (from Omarchy's agent-usage data). |
 | **About This System** | `SystemAboutWidget.qml` + `get-about.sh` | fastfetch-style summary plus the active theme's colour swatches. |
@@ -36,20 +36,24 @@ bash <(curl -fsSL https://raw.githubusercontent.com/DasPoxy/desktop-widgets/main
 This checks that [dagyr.desktop-widgets](https://github.com/cyelis1224/omarchy-desktop-widgets)
 is installed and stops with a link to it if it isn't. Otherwise it clones this
 repo to `~/.local/share/desktop-widgets` (or pulls it if it's already there)
-and runs `install.sh` from it. Then reload the shell (step 3 below). Re-run the
-same line to update.
-
-While this repo is private, `curl` can't reach it; use the GitHub CLI instead:
+and runs `install.sh` from it. Then reload the shell:
 
 ```sh
-bash <(gh api -H 'Accept: application/vnd.github.raw' repos/DasPoxy/desktop-widgets/contents/bootstrap.sh)
+rm -rf ~/.cache/quickshell/qmlcache && omarchy-restart-shell
 ```
+
+Re-run the same line to update.
 
 ### Manual
 
 1. Install the upstream plugin first. `UPSTREAM` records the repo and commit
    these were built on.
-2. Run `./install.sh`. It copies the new files in. For the two edited upstream
+2. Clone this repo and run the installer:
+   ```sh
+   git clone https://github.com/DasPoxy/desktop-widgets.git
+   cd desktop-widgets && ./install.sh
+   ```
+   It copies the new files in. For the two edited upstream
    files, it copies them outright if the plugin is at the recorded commit, and
    otherwise applies just our edits as a patch, so a newer upstream isn't
    overwritten. Anything it replaces is backed up under
@@ -59,7 +63,8 @@ bash <(gh api -H 'Accept: application/vnd.github.raw' repos/DasPoxy/desktop-widg
    right-click → layout presets → Import.
 
 A plugin update (`git pull` in the plugin) leaves the new files alone but may
-revert the two upstream edits. Re-run `./install.sh` afterwards.
+revert the two upstream edits. Re-run the one-line installer (or
+`./install.sh`) afterwards.
 
 ## Keeping this backup current
 

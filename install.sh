@@ -72,4 +72,4 @@ chmod +x "$PLUGIN"/get-*.sh 2>/dev/null || true
 echo
 echo "Done. Reload the shell to pick it up:"
 echo "  rm -rf ~/.cache/quickshell/qmlcache && omarchy-restart-shell"
-echo "Layout presets are in layouts/ -- import them from the desktop right-click menu."
+echo "Layout presets are in $REPO/layouts/ -- import them from the desktop right-click menu."
