@@ -136,12 +136,27 @@ WidgetCard {
   }
 
   // ---------------------------------------------------------------------------
-  // ✏️ Custom Header / Button Text (right-click menu). Empty = default.
+  // ✏️ Custom Header / Button Text (right-click menu). Empty = default;
+  // the "Blank" toggles show no text at all.
   // ---------------------------------------------------------------------------
   readonly property string defaultHeaderText: "Visit Another Realm"
   readonly property string defaultButtonText: "Adventure Awaits!"
   property string headerText: ""
   property string buttonText: ""
+  property bool headerBlank: false
+  property bool buttonBlank: false
+  readonly property string shownHeaderText: headerBlank ? "" : (headerText || defaultHeaderText)
+  readonly property string shownButtonText: buttonBlank ? "" : (buttonText || defaultButtonText)
+
+  function setHeaderBlank(b) {
+    realmWidgetRoot.headerBlank = b
+    realmWidgetRoot.saveSetting("headerBlank", b)
+  }
+
+  function setButtonBlank(b) {
+    realmWidgetRoot.buttonBlank = b
+    realmWidgetRoot.saveSetting("buttonBlank", b)
+  }
 
   function setHeaderText(t) {
     realmWidgetRoot.headerText = t
@@ -261,6 +276,8 @@ WidgetCard {
     realmWidgetRoot.swatchSlant = getSetting("swatchSlant", "left")
     realmWidgetRoot.headerText = getSetting("headerText", "")
     realmWidgetRoot.buttonText = getSetting("buttonText", "")
+    realmWidgetRoot.headerBlank = getSetting("headerBlank", false)
+    realmWidgetRoot.buttonBlank = getSetting("buttonBlank", false)
     var ex = getSetting("excludedGames", [])
     realmWidgetRoot.excludedGames = Array.isArray(ex) ? ex : []
   }
@@ -387,6 +404,8 @@ WidgetCard {
             selectionColor: Qt.rgba(Color.accent.r, Color.accent.g, Color.accent.b, 0.4)
             clip: true
             maximumLength: 40
+            enabled: !realmWidgetRoot.headerBlank
+            opacity: realmWidgetRoot.headerBlank ? 0.35 : 1
             text: realmWidgetRoot.headerText
             onTextEdited: realmWidgetRoot.setHeaderText(text)
 
@@ -394,7 +413,7 @@ WidgetCard {
               anchors.fill: parent
               verticalAlignment: Text.AlignVCenter
               visible: !headerTextInput.text && !headerTextInput.activeFocus
-              text: realmWidgetRoot.defaultHeaderText
+              text: realmWidgetRoot.headerBlank ? "(blank)" : realmWidgetRoot.defaultHeaderText
               font.family: Style.font.family
               font.pixelSize: 11
               color: Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.35)
@@ -408,6 +427,35 @@ WidgetCard {
                 realmWidgetRoot.grabKeyboard(headerTextInput)
                 mouse.accepted = false
               }
+            }
+          }
+        }
+
+        Rectangle {
+          implicitWidth: 46
+          implicitHeight: 26
+          radius: 6
+          color: realmWidgetRoot.headerBlank ? Qt.rgba(Color.accent.r, Color.accent.g, Color.accent.b, 0.3) : (headerBlankMouse.containsMouse ? Qt.rgba(1, 1, 1, 0.1) : Qt.rgba(1, 1, 1, 0.05))
+          border.color: realmWidgetRoot.headerBlank ? Color.accent : "transparent"
+          border.width: 1
+
+          Text {
+            anchors.centerIn: parent
+            text: "Blank"
+            font.family: Style.font.family
+            font.pixelSize: 10
+            font.weight: realmWidgetRoot.headerBlank ? Font.Bold : Font.Normal
+            color: realmWidgetRoot.headerBlank ? Color.accent : Color.foreground
+          }
+
+          MouseArea {
+            id: headerBlankMouse
+            anchors.fill: parent
+            hoverEnabled: true
+            cursorShape: Qt.PointingHandCursor
+            onClicked: {
+              headerTextInput.focus = false
+              realmWidgetRoot.setHeaderBlank(!realmWidgetRoot.headerBlank)
             }
           }
         }
@@ -447,6 +495,8 @@ WidgetCard {
             selectionColor: Qt.rgba(Color.accent.r, Color.accent.g, Color.accent.b, 0.4)
             clip: true
             maximumLength: 40
+            enabled: !realmWidgetRoot.buttonBlank
+            opacity: realmWidgetRoot.buttonBlank ? 0.35 : 1
             text: realmWidgetRoot.buttonText
             onTextEdited: realmWidgetRoot.setButtonText(text)
 
@@ -454,7 +504,7 @@ WidgetCard {
               anchors.fill: parent
               verticalAlignment: Text.AlignVCenter
               visible: !buttonTextInput.text && !buttonTextInput.activeFocus
-              text: realmWidgetRoot.defaultButtonText
+              text: realmWidgetRoot.buttonBlank ? "(blank)" : realmWidgetRoot.defaultButtonText
               font.family: Style.font.family
               font.pixelSize: 11
               color: Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.35)
@@ -468,6 +518,35 @@ WidgetCard {
                 realmWidgetRoot.grabKeyboard(buttonTextInput)
                 mouse.accepted = false
               }
+            }
+          }
+        }
+
+        Rectangle {
+          implicitWidth: 46
+          implicitHeight: 26
+          radius: 6
+          color: realmWidgetRoot.buttonBlank ? Qt.rgba(Color.accent.r, Color.accent.g, Color.accent.b, 0.3) : (buttonBlankMouse.containsMouse ? Qt.rgba(1, 1, 1, 0.1) : Qt.rgba(1, 1, 1, 0.05))
+          border.color: realmWidgetRoot.buttonBlank ? Color.accent : "transparent"
+          border.width: 1
+
+          Text {
+            anchors.centerIn: parent
+            text: "Blank"
+            font.family: Style.font.family
+            font.pixelSize: 10
+            font.weight: realmWidgetRoot.buttonBlank ? Font.Bold : Font.Normal
+            color: realmWidgetRoot.buttonBlank ? Color.accent : Color.foreground
+          }
+
+          MouseArea {
+            id: buttonBlankMouse
+            anchors.fill: parent
+            hoverEnabled: true
+            cursorShape: Qt.PointingHandCursor
+            onClicked: {
+              buttonTextInput.focus = false
+              realmWidgetRoot.setButtonBlank(!realmWidgetRoot.buttonBlank)
             }
           }
         }
@@ -935,7 +1014,7 @@ WidgetCard {
       Text {
         Layout.fillWidth: true
         horizontalAlignment: Text.AlignHCenter
-        text: realmWidgetRoot.headerText || realmWidgetRoot.defaultHeaderText
+        text: realmWidgetRoot.shownHeaderText
         font.family: Style.font.family
         font.pixelSize: 12
         font.weight: Font.Bold
@@ -1141,7 +1220,7 @@ WidgetCard {
 
       Text {
         anchors.centerIn: parent
-        text: realmWidgetRoot.launching ? "Opening portal..." : (realmWidgetRoot.buttonText || realmWidgetRoot.defaultButtonText)
+        text: realmWidgetRoot.launching ? "Opening portal..." : realmWidgetRoot.shownButtonText
         font.family: Style.font.family
         font.pixelSize: 13
         font.weight: Font.Bold
