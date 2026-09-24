@@ -48,6 +48,32 @@ WidgetCard {
     saveSetting("lyricsFontScale", v)
   }
   property var lyricsOffsets: ({}) // trackKey -> ms; + = lyrics earlier
+  // Lyric translation: target language ("" = off), shown under each line;
+  // the header chip hides/shows it without losing the language.
+  property string translateLang: ""
+  property bool showTranslation: true
+  readonly property var translateChoices: [
+    { code: "", label: "Off" },
+    { code: "en", label: "English" },
+    { code: "es", label: "Español" },
+    { code: "fr", label: "Français" },
+    { code: "de", label: "Deutsch" },
+    { code: "it", label: "Italiano" },
+    { code: "pt", label: "Português" },
+    { code: "nl", label: "Nederlands" },
+    { code: "ru", label: "Русский" },
+    { code: "ja", label: "日本語" },
+    { code: "ko", label: "한국어" },
+    { code: "zh-CN", label: "中文" }
+  ]
+  function setTranslateLang(v) {
+    translateLang = v
+    saveSetting("translateLang", v)
+    if (v !== "" && !showTranslation) {
+      showTranslation = true
+      saveSetting("showTranslation", true)
+    }
+  }
   property bool themeColors: true // off = accent-only, like before
 
   // ---------------------------------------------------------------------------
@@ -126,6 +152,8 @@ WidgetCard {
     showLabelArt = getSetting("showLabelArt", true)
     lyricsFontScale = getSetting("lyricsFontScale", 1.0)
     themeColors = getSetting("themeColors", true)
+    translateLang = getSetting("translateLang", "")
+    showTranslation = getSetting("showTranslation", true)
     var o = getSetting("lyricsOffsets", {})
     lyricsOffsets = (o && typeof o === "object") ? o : {}
   }
@@ -469,6 +497,74 @@ WidgetCard {
     }
   }
 
+  // ---------------------------------------------------------------------------
+  // 🌐 Translation -- get-lyrics-translation.sh machine-translates the lines
+  // (Google, falling back to MyMemory; cached on disk). One entry per lyric
+  // line, "" where a line is blank or already in the target language.
+  // ---------------------------------------------------------------------------
+  property var translationLines: []
+  property string translationStatus: "idle" // idle | loading | ok | same | error
+  property string translationFrom: ""
+  readonly property bool translationShown: translateLang !== "" && showTranslation && translationStatus === "ok"
+  readonly property string translationKey: (lyricsStatus === "ok" && translateLang !== "" && showTranslation)
+    ? trackKey + "\n" + translateLang + "\n" + lyricsLines.length : ""
+  readonly property string translateScriptPath: {
+    var u = Qt.resolvedUrl("../get-lyrics-translation.sh").toString()
+    return decodeURIComponent(u.replace(/^file:\/\//, ""))
+  }
+
+  onTranslationKeyChanged: {
+    translationLines = []
+    translationStatus = translationKey ? "loading" : "idle"
+    if (translationKey) translateDebounce.restart()
+  }
+  Timer {
+    id: translateDebounce
+    interval: 300
+    onTriggered: mprisRoot.fetchTranslation()
+  }
+  function fetchTranslation() {
+    if (!mprisRoot.translationKey) return
+    if (translateProc.running) { translateProc.refetch = true; return }
+    var texts = []
+    for (var i = 0; i < mprisRoot.lyricsLines.length; i++) texts.push(mprisRoot.lyricsLines[i].text || "")
+    translateProc.requestKey = mprisRoot.translationKey
+    translateProc.command = [mprisRoot.translateScriptPath, mprisRoot.translateLang, JSON.stringify(texts)]
+    translateProc.running = true
+  }
+  function toggleTranslation() {
+    mprisRoot.showTranslation = !mprisRoot.showTranslation
+    mprisRoot.saveSetting("showTranslation", mprisRoot.showTranslation)
+  }
+
+  Process {
+    id: translateProc
+    property string requestKey: ""
+    property bool refetch: false
+    running: false
+    stdout: SplitParser {
+      onRead: function(line) {
+        var str = String(line).trim()
+        if (!str || translateProc.requestKey !== mprisRoot.translationKey) return
+        try {
+          var res = JSON.parse(str)
+          mprisRoot.translationStatus = res.status || "error"
+          mprisRoot.translationLines = (res.status === "ok" && res.lines) ? res.lines : []
+          mprisRoot.translationFrom = res.from || ""
+        } catch (e) {
+          mprisRoot.translationStatus = "error"
+          console.warn("[MprisPlayerWidget] translation parse error:", e)
+        }
+      }
+    }
+    onExited: function(exitCode) {
+      if (translateProc.refetch || translateProc.requestKey !== mprisRoot.translationKey) {
+        translateProc.refetch = false
+        mprisRoot.fetchTranslation()
+      }
+    }
+  }
+
   // Index of the line being sung (binary search on the karaoke clock, tiny
   // lead so a line lights up as it starts rather than after).
   readonly property int currentLyricIndex: {
@@ -727,11 +823,65 @@ WidgetCard {
       }
 
       Text {
+        text: "TRANSLATE LYRICS"
+        font.family: Style.font.family
+        font.pixelSize: 9
+        font.weight: Font.Bold
+        color: Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.45)
+        Layout.leftMargin: 4
+        Layout.topMargin: 6
+      }
+
+      GridLayout {
+        Layout.fillWidth: true
+        Layout.leftMargin: 4
+        Layout.rightMargin: 4
+        columns: 4
+        columnSpacing: Style.space(4)
+        rowSpacing: Style.space(4)
+
+        Repeater {
+          model: mprisRoot.translateChoices
+
+          delegate: Rectangle {
+            required property var modelData
+            Layout.fillWidth: true
+            implicitHeight: 24
+            radius: 6
+            readonly property bool isActive: mprisRoot.translateLang === modelData.code
+            color: isActive ? Qt.rgba(Color.accent.r, Color.accent.g, Color.accent.b, 0.3) : (langMouse.containsMouse ? Qt.rgba(1, 1, 1, 0.1) : Qt.rgba(1, 1, 1, 0.05))
+            border.color: isActive ? Color.accent : "transparent"
+            border.width: 1
+
+            Text {
+              anchors.centerIn: parent
+              width: parent.width - 4
+              horizontalAlignment: Text.AlignHCenter
+              elide: Text.ElideRight
+              text: modelData.label
+              font.family: Style.font.family
+              font.pixelSize: 9
+              font.weight: isActive ? Font.Bold : Font.Normal
+              color: isActive ? Color.accent : Color.foreground
+            }
+
+            MouseArea {
+              id: langMouse
+              anchors.fill: parent
+              hoverEnabled: true
+              cursorShape: Qt.PointingHandCursor
+              onClicked: mprisRoot.setTranslateLang(modelData.code)
+            }
+          }
+        }
+      }
+
+      Text {
         Layout.fillWidth: true
         Layout.leftMargin: 4
         Layout.rightMargin: 4
         Layout.topMargin: 4
-        text: "Switch sources with the chips along the bottom of the panel. Lyrics come from a matching .lrc next to local files, else LRCLIB (lrclib.net), cached. If the highlight runs early/late, use the − / + timing buttons in the lyrics header (saved per track)."
+        text: "Switch sources with the chips along the bottom of the panel. Lyrics come from a matching .lrc next to local files, else LRCLIB (lrclib.net), cached. If the highlight runs early/late, use the − / + timing buttons in the lyrics header (saved per track). Translations are machine-made (Google Translate, else MyMemory) since the lyric sites don't carry any; they show under each line, skipping lines already in your language. The 󰗊 chip in the lyrics header hides/shows them."
         wrapMode: Text.WordWrap
         font.family: Style.font.family
         font.pixelSize: 9
@@ -938,6 +1088,47 @@ WidgetCard {
             }
           }
 
+          // Translation chip: language code; click hides/shows the
+          // translation. Dim while loading, or when there's nothing to show.
+          Rectangle {
+            visible: mprisRoot.translateLang !== "" && mprisRoot.lyricsStatus === "ok"
+            readonly property bool live: mprisRoot.showTranslation && mprisRoot.translationStatus === "ok"
+            implicitWidth: transChipText.implicitWidth + mprisRoot.sp(10)
+            implicitHeight: mprisRoot.sp(16)
+            radius: height / 2
+            color: transMouse.containsMouse ? Qt.rgba(Color.accent.r, Color.accent.g, Color.accent.b, 0.25)
+              : (live ? mprisRoot.tint(mprisRoot.cSecondary, 0.18) : Qt.rgba(1, 1, 1, 0.06))
+            border.color: live ? mprisRoot.cSecondary : Qt.rgba(1, 1, 1, 0.12)
+            border.width: 1
+
+            Text {
+              id: transChipText
+              anchors.centerIn: parent
+              text: {
+                var code = mprisRoot.translateLang.split("-")[0].toUpperCase()
+                if (!mprisRoot.showTranslation) return "󰗊 " + code
+                switch (mprisRoot.translationStatus) {
+                  case "loading": return "󰗊 …"
+                  case "same": return "󰗊 " + code + " ✓"
+                  case "error": return "󰗊 " + code + " !"
+                  default: return "󰗊 " + (mprisRoot.translationFrom ? mprisRoot.translationFrom.toUpperCase() + "→" : "") + code
+                }
+              }
+              font.family: Style.font.family
+              font.pixelSize: mprisRoot.sp(8)
+              font.weight: Font.Bold
+              color: parent.live ? mprisRoot.cSecondary : Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.45)
+            }
+
+            MouseArea {
+              id: transMouse
+              anchors.fill: parent
+              hoverEnabled: true
+              cursorShape: Qt.PointingHandCursor
+              onClicked: mprisRoot.toggleTranslation()
+            }
+          }
+
           Text {
             visible: mprisRoot.lyricsStatus === "ok" && !mprisRoot.lyricsSynced
             text: mprisRoot.lyricsSource
@@ -1043,37 +1234,62 @@ WidgetCard {
               onTriggered: { lyricsView.userScrolled = false; lyricsView.followLine() }
             }
 
-            delegate: Text {
+            delegate: Item {
+              id: lineItem
               required property var modelData
               required property int index
               readonly property bool current: index === mprisRoot.currentLyricIndex
               readonly property bool past: mprisRoot.lyricsSynced && index < mprisRoot.currentLyricIndex
+              readonly property string translation: (mprisRoot.translationShown && index < mprisRoot.translationLines.length)
+                ? (mprisRoot.translationLines[index] || "") : ""
               width: ListView.view.width
-              // Current line sweeps sung characters into the accent colour,
-              // shading toward the secondary hue along the line.
-              readonly property string lineText: modelData.text === "" ? "♪" : modelData.text
-              textFormat: current ? Text.StyledText : Text.PlainText
-              text: {
-                if (!current) return lineText
-                var n = Math.round(lineText.length * mprisRoot.currentLineProgress)
-                return mprisRoot.sweepHtml(lineText.slice(0, n), lineText.length)
-                  + "<font color=\"" + Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.55) + "\">" + mprisRoot.escapeHtml(lineText.slice(n)) + "</font>"
-              }
-              wrapMode: Text.WordWrap
-              horizontalAlignment: Text.AlignLeft
-              font.family: Style.font.family
-              font.pixelSize: mprisRoot.sp((current ? 13 : 11) * mprisRoot.lyricsFontScale)
-              font.weight: current ? Font.Bold : Font.Normal
-              color: past && mprisRoot.themeColors ? mprisRoot.cTertiary : Color.foreground
+              height: lyricLine.implicitHeight + (translation !== "" ? mprisRoot.sp(2) + translationLine.implicitHeight : 0)
               opacity: !mprisRoot.lyricsSynced ? 0.8 : (current ? 1.0 : (past ? 0.35 : 0.55))
               Behavior on opacity { NumberAnimation { duration: 200 } }
+
+              Text {
+                id: lyricLine
+                width: parent.width
+                // Current line sweeps sung characters into the accent colour,
+                // shading toward the secondary hue along the line.
+                readonly property string lineText: lineItem.modelData.text === "" ? "♪" : lineItem.modelData.text
+                textFormat: lineItem.current ? Text.StyledText : Text.PlainText
+                text: {
+                  if (!lineItem.current) return lineText
+                  var n = Math.round(lineText.length * mprisRoot.currentLineProgress)
+                  return mprisRoot.sweepHtml(lineText.slice(0, n), lineText.length)
+                    + "<font color=\"" + Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.55) + "\">" + mprisRoot.escapeHtml(lineText.slice(n)) + "</font>"
+                }
+                wrapMode: Text.WordWrap
+                horizontalAlignment: Text.AlignLeft
+                font.family: Style.font.family
+                font.pixelSize: mprisRoot.sp((lineItem.current ? 13 : 11) * mprisRoot.lyricsFontScale)
+                font.weight: lineItem.current ? Font.Bold : Font.Normal
+                color: lineItem.past && mprisRoot.themeColors ? mprisRoot.cTertiary : Color.foreground
+              }
+
+              // The translation, smaller and in the secondary hue, under its line.
+              Text {
+                id: translationLine
+                visible: lineItem.translation !== ""
+                y: lyricLine.implicitHeight + mprisRoot.sp(2)
+                width: parent.width
+                text: lineItem.translation
+                textFormat: Text.PlainText
+                wrapMode: Text.WordWrap
+                font.family: Style.font.family
+                font.pixelSize: mprisRoot.sp((lineItem.current ? 10.5 : 9.5) * mprisRoot.lyricsFontScale)
+                font.italic: true
+                color: mprisRoot.themeColors ? mprisRoot.cSecondary : Color.accent
+                opacity: lineItem.current ? 0.95 : 0.8
+              }
 
               // Click a synced line to jump there.
               MouseArea {
                 anchors.fill: parent
-                enabled: mprisRoot.lyricsSynced && modelData.t >= 0 && mprisRoot.lengthSec > 0
+                enabled: mprisRoot.lyricsSynced && lineItem.modelData.t >= 0 && mprisRoot.lengthSec > 0
                 cursorShape: enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
-                onClicked: mprisRoot.seekToFrac((modelData.t / 1000) / mprisRoot.lengthSec)
+                onClicked: mprisRoot.seekToFrac((lineItem.modelData.t / 1000) / mprisRoot.lengthSec)
               }
             }
           }
