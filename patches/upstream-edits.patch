@@ -44,6 +44,242 @@ index 6e42279..8b6cf6d 100644
                        }
                      }
                    }
+diff --git a/get-network.sh b/get-network.sh
+index 78f6a9a..c2cbbfd 100755
+--- a/get-network.sh
++++ b/get-network.sh
+@@ -11,13 +11,54 @@ STATE_DIR = os.path.expanduser('~/.local/state/omarchy')
+ STATE_FILE = os.path.join(STATE_DIR, 'dagyr.desktop-widgets.json')
+ LEGACY_CONFIG = os.path.expanduser('~/.config/omarchy/plugins/dagyr.desktop-widgets/settings.json')
+ 
+-def load_settings():
+-    if os.path.exists(STATE_FILE):
++# --- Safe state-file access -------------------------------------------------
++# Several scripts read-modify-write the same state file. Without this, two
++# saves landing together could let one read a half-written file, fall back
++# to defaults and save those -- wiping every layout preset (it happened).
++# So: one writer at a time (flock), writes are atomic (temp file + rename),
++# and a file that exists but won't parse is never replaced with defaults.
++import fcntl
++import time
++
++_state_lock = None
++
++
++def _lock_state():
++    global _state_lock
++    if _state_lock is None:
++        os.makedirs(STATE_DIR, exist_ok=True)
++        _state_lock = open(STATE_FILE + '.lock', 'a')
++        fcntl.flock(_state_lock, fcntl.LOCK_EX)
++
++
++def _read_state_file():
++    last = None
++    for _ in range(10):
+         try:
+             with open(STATE_FILE, 'r') as f:
+                 return json.load(f)
+-        except Exception:
+-            pass
++        except FileNotFoundError:
++            return None
++        except Exception as e:
++            last = e
++            time.sleep(0.05)
++    raise RuntimeError('state file unreadable, refusing to overwrite it: %s' % last)
++
++
++def _write_state_file(data):
++    os.makedirs(STATE_DIR, exist_ok=True)
++    tmp = '%s.tmp.%d' % (STATE_FILE, os.getpid())
++    with open(tmp, 'w') as f:
++        json.dump(data, f, indent=2)
++        f.flush()
++        os.fsync(f.fileno())
++    os.replace(tmp, STATE_FILE)
++
++
++def load_settings():
++    _lock_state()
++    if os.path.exists(STATE_FILE):
++        return _read_state_file()  # raises rather than fall back to defaults
+     elif os.path.exists(LEGACY_CONFIG):
+         try:
+             with open(LEGACY_CONFIG, 'r') as f:
+@@ -28,9 +69,7 @@ def load_settings():
+ 
+ def save_settings(settings):
+     try:
+-        os.makedirs(STATE_DIR, exist_ok=True)
+-        with open(STATE_FILE, 'w') as f:
+-            json.dump(settings, f, indent=2)
++        _write_state_file(settings)
+     except Exception:
+         pass
+ 
+diff --git a/get-photos.sh b/get-photos.sh
+index e9b3a4f..07edcd2 100755
+--- a/get-photos.sh
++++ b/get-photos.sh
+@@ -11,6 +11,50 @@ STATE_DIR = os.path.expanduser('~/.local/state/omarchy')
+ STATE_FILE = os.path.join(STATE_DIR, 'dagyr.desktop-widgets.json')
+ LEGACY_CONFIG = os.path.expanduser('~/.config/omarchy/plugins/dagyr.desktop-widgets/settings.json')
+ 
++# --- Safe state-file access -------------------------------------------------
++# Several scripts read-modify-write the same state file. Without this, two
++# saves landing together could let one read a half-written file, fall back
++# to defaults and save those -- wiping every layout preset (it happened).
++# So: one writer at a time (flock), writes are atomic (temp file + rename),
++# and a file that exists but won't parse is never replaced with defaults.
++import fcntl
++import time
++
++_state_lock = None
++
++
++def _lock_state():
++    global _state_lock
++    if _state_lock is None:
++        os.makedirs(STATE_DIR, exist_ok=True)
++        _state_lock = open(STATE_FILE + '.lock', 'a')
++        fcntl.flock(_state_lock, fcntl.LOCK_EX)
++
++
++def _read_state_file():
++    last = None
++    for _ in range(10):
++        try:
++            with open(STATE_FILE, 'r') as f:
++                return json.load(f)
++        except FileNotFoundError:
++            return None
++        except Exception as e:
++            last = e
++            time.sleep(0.05)
++    raise RuntimeError('state file unreadable, refusing to overwrite it: %s' % last)
++
++
++def _write_state_file(data):
++    os.makedirs(STATE_DIR, exist_ok=True)
++    tmp = '%s.tmp.%d' % (STATE_FILE, os.getpid())
++    with open(tmp, 'w') as f:
++        json.dump(data, f, indent=2)
++        f.flush()
++        os.fsync(f.fileno())
++    os.replace(tmp, STATE_FILE)
++
++
+ DEFAULT_DIRS = [
+     os.path.expanduser('~/.config/omarchy/plugins/dagyr.desktop-widgets/photos'),
+     os.path.expanduser('~/Wallpapers'),
+@@ -19,12 +63,9 @@ DEFAULT_DIRS = [
+ ]
+ 
+ def load_settings():
++    _lock_state()
+     if os.path.exists(STATE_FILE):
+-        try:
+-            with open(STATE_FILE, 'r') as f:
+-                return json.load(f)
+-        except Exception:
+-            pass
++        return _read_state_file()  # raises rather than fall back to defaults
+     elif os.path.exists(LEGACY_CONFIG):
+         try:
+             with open(LEGACY_CONFIG, 'r') as f:
+@@ -35,9 +76,7 @@ def load_settings():
+ 
+ def save_settings(settings):
+     try:
+-        os.makedirs(STATE_DIR, exist_ok=True)
+-        with open(STATE_FILE, 'w') as f:
+-            json.dump(settings, f, indent=2)
++        _write_state_file(settings)
+     except Exception:
+         pass
+ 
+diff --git a/manage-positions.sh b/manage-positions.sh
+index 89e1c27..d34cf26 100755
+--- a/manage-positions.sh
++++ b/manage-positions.sh
+@@ -10,6 +10,50 @@ STATE_DIR = os.path.expanduser('~/.local/state/omarchy')
+ STATE_FILE = os.path.join(STATE_DIR, 'dagyr.desktop-widgets.json')
+ LEGACY_CONFIG = os.path.expanduser('~/.config/omarchy/plugins/dagyr.desktop-widgets/settings.json')
+ 
++# --- Safe state-file access -------------------------------------------------
++# Several scripts read-modify-write the same state file. Without this, two
++# saves landing together could let one read a half-written file, fall back
++# to defaults and save those -- wiping every layout preset (it happened).
++# So: one writer at a time (flock), writes are atomic (temp file + rename),
++# and a file that exists but won't parse is never replaced with defaults.
++import fcntl
++import time
++
++_state_lock = None
++
++
++def _lock_state():
++    global _state_lock
++    if _state_lock is None:
++        os.makedirs(STATE_DIR, exist_ok=True)
++        _state_lock = open(STATE_FILE + '.lock', 'a')
++        fcntl.flock(_state_lock, fcntl.LOCK_EX)
++
++
++def _read_state_file():
++    last = None
++    for _ in range(10):
++        try:
++            with open(STATE_FILE, 'r') as f:
++                return json.load(f)
++        except FileNotFoundError:
++            return None
++        except Exception as e:
++            last = e
++            time.sleep(0.05)
++    raise RuntimeError('state file unreadable, refusing to overwrite it: %s' % last)
++
++
++def _write_state_file(data):
++    os.makedirs(STATE_DIR, exist_ok=True)
++    tmp = '%s.tmp.%d' % (STATE_FILE, os.getpid())
++    with open(tmp, 'w') as f:
++        json.dump(data, f, indent=2)
++        f.flush()
++        os.fsync(f.fileno())
++    os.replace(tmp, STATE_FILE)
++
++
+ DEFAULT_ENABLED = ["clock", "gallery", "coin_tracker", "network", "media", "system"]
+ 
+ BUILTIN_MIGRATION = {
+@@ -324,12 +368,9 @@ def migrate_custom_builtins(data):
+ 
+ def load_settings():
+     data = None
++    _lock_state()
+     if os.path.exists(STATE_FILE):
+-        try:
+-            with open(STATE_FILE, 'r') as f:
+-                data = json.load(f)
+-        except Exception:
+-            pass
++        data = _read_state_file()  # raises rather than fall back to defaults
+     elif os.path.exists(LEGACY_CONFIG):
+         try:
+             with open(LEGACY_CONFIG, 'r') as f:
+@@ -421,9 +462,7 @@ def sync_git_settings(data, backup_or_prof=None):
+ 
+ def save_settings(data):
+     try:
+-        os.makedirs(STATE_DIR, exist_ok=True)
+-        with open(STATE_FILE, 'w') as f:
+-            json.dump(data, f, indent=2)
++        _write_state_file(data)
+     except Exception:
+         pass
+ 
 diff --git a/widgets/WidgetRegistry.qml b/widgets/WidgetRegistry.qml
 index 54e7986..fd1ab4a 100644
 --- a/widgets/WidgetRegistry.qml
