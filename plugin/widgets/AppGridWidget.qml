@@ -58,8 +58,45 @@ WidgetCard {
     return t < 0.5 ? pal.mixColor(pal.primary, pal.tertiary, t * 2) : pal.mixColor(pal.tertiary, pal.secondary, (t - 0.5) * 2)
   }
 
+  // Header: custom title / glyph, or hide either. Empty text = the default.
+  // With both hidden the header row goes away and the apps get its space
+  // (it still shows in edit mode and while picking apps).
+  readonly property string defaultTitle: "Quick Launch"
+  readonly property string defaultGlyph: ""
+  property string titleText: ""
+  property string glyphText: ""
+  property bool titleHidden: false
+  property bool glyphHidden: false
+  readonly property string shownTitle: titleText || defaultTitle
+  readonly property string shownGlyph: glyphText || defaultGlyph
+  readonly property bool headerShown: pickerOpen || !!(rootRef && rootRef.layoutEditMode) || !titleHidden || !glyphHidden
+
+  function setHeaderSetting(key, val) {
+    gridWidgetRoot[key] = val
+    gridWidgetRoot.saveSetting(key, val)
+  }
+
+  // Menu text fields need keyboard focus on the desktop layer.
+  property bool holdsKeyboardFocus: false
+  function grabKeyboard(input) {
+    if (rootRef && "keyboardFocusRequested" in rootRef) rootRef.keyboardFocusRequested = true
+    gridWidgetRoot.holdsKeyboardFocus = true
+    input.forceActiveFocus()
+  }
+  function releaseKeyboard() {
+    if (!gridWidgetRoot.holdsKeyboardFocus) return
+    gridWidgetRoot.holdsKeyboardFocus = false
+    // The app picker has its own claim on the keyboard.
+    if (!gridWidgetRoot.pickerOpen && rootRef && rootRef.keyboardFocusRequested) rootRef.keyboardFocusRequested = false
+  }
+  onContextMenuOpenChanged: if (!contextMenuOpen) releaseKeyboard()
+
   function applySavedSettings() {
     themeColors = getSetting("themeColors", true)
+    titleText = getSetting("titleText", "")
+    glyphText = getSetting("glyphText", "")
+    titleHidden = getSetting("titleHidden", false)
+    glyphHidden = getSetting("glyphHidden", false)
     var pinned = getSetting("pinnedApps", undefined)
     if (Array.isArray(pinned)) gridWidgetRoot.pinnedApps = pinned
     var cols = getSetting("gridCols", 4)
@@ -214,10 +251,142 @@ WidgetCard {
     return out
   }
 
+  // One "label [text field] [Hide]" row of the menu's HEADER section.
+  component HeaderField: RowLayout {
+    id: field
+    property var host
+    property string label: ""
+    property string value: ""
+    property string placeholder: ""
+    property bool hidden: false
+    property int maxLength: 40
+    signal edited(string text)
+    signal hideToggled()
+    Layout.fillWidth: true
+    Layout.leftMargin: 4
+    Layout.rightMargin: 4
+    spacing: Style.space(6)
+
+    Text {
+      Layout.preferredWidth: 38
+      text: field.label
+      font.family: Style.font.family
+      font.pixelSize: 10
+      color: Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.7)
+    }
+
+    Rectangle {
+      Layout.fillWidth: true
+      implicitHeight: 26
+      radius: 6
+      color: Qt.rgba(1, 1, 1, 0.07)
+      border.color: fieldInput.activeFocus ? Color.accent : Qt.rgba(1, 1, 1, 0.12)
+      border.width: 1
+
+      TextInput {
+        id: fieldInput
+        anchors.fill: parent
+        anchors.leftMargin: Style.space(8)
+        anchors.rightMargin: Style.space(8)
+        verticalAlignment: TextInput.AlignVCenter
+        font.family: Style.font.family
+        font.pixelSize: 11
+        color: Color.foreground
+        selectionColor: Qt.rgba(Color.accent.r, Color.accent.g, Color.accent.b, 0.4)
+        clip: true
+        maximumLength: field.maxLength
+        enabled: !field.hidden
+        opacity: field.hidden ? 0.35 : 1
+        text: field.value
+        onTextEdited: field.edited(text)
+
+        Text {
+          anchors.fill: parent
+          verticalAlignment: Text.AlignVCenter
+          visible: !fieldInput.text && !fieldInput.activeFocus
+          text: field.hidden ? "(hidden)" : field.placeholder
+          font.family: Style.font.family
+          font.pixelSize: 11
+          color: Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.35)
+          elide: Text.ElideRight
+        }
+
+        MouseArea {
+          anchors.fill: parent
+          cursorShape: Qt.IBeamCursor
+          onPressed: function(mouse) {
+            field.host.grabKeyboard(fieldInput)
+            mouse.accepted = false
+          }
+        }
+      }
+    }
+
+    Rectangle {
+      implicitWidth: 46
+      implicitHeight: 26
+      radius: 6
+      color: field.hidden ? Qt.rgba(Color.accent.r, Color.accent.g, Color.accent.b, 0.3) : (hideMouse.containsMouse ? Qt.rgba(1, 1, 1, 0.1) : Qt.rgba(1, 1, 1, 0.05))
+      border.color: field.hidden ? Color.accent : "transparent"
+      border.width: 1
+
+      Text {
+        anchors.centerIn: parent
+        text: "Hide"
+        font.family: Style.font.family
+        font.pixelSize: 10
+        font.weight: field.hidden ? Font.Bold : Font.Normal
+        color: field.hidden ? Color.accent : Color.foreground
+      }
+
+      MouseArea {
+        id: hideMouse
+        anchors.fill: parent
+        hoverEnabled: true
+        cursorShape: Qt.PointingHandCursor
+        onClicked: {
+          fieldInput.focus = false
+          field.hideToggled()
+        }
+      }
+    }
+  }
+
   customMenuContent: Component {
     ColumnLayout {
       Layout.fillWidth: true
       spacing: Style.space(4)
+
+      Text {
+        text: "HEADER"
+        font.family: Style.font.family
+        font.pixelSize: 9
+        font.weight: Font.Bold
+        color: Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.45)
+        Layout.leftMargin: 4
+        Layout.topMargin: 2
+      }
+
+      HeaderField {
+        host: gridWidgetRoot
+        label: "Title"
+        value: gridWidgetRoot.titleText
+        placeholder: gridWidgetRoot.defaultTitle
+        hidden: gridWidgetRoot.titleHidden
+        onEdited: function(text) { gridWidgetRoot.setHeaderSetting("titleText", text) }
+        onHideToggled: gridWidgetRoot.setHeaderSetting("titleHidden", !gridWidgetRoot.titleHidden)
+      }
+
+      HeaderField {
+        host: gridWidgetRoot
+        label: "Glyph"
+        value: gridWidgetRoot.glyphText
+        placeholder: gridWidgetRoot.defaultGlyph + "  (paste a Nerd Font glyph)"
+        hidden: gridWidgetRoot.glyphHidden
+        maxLength: 4
+        onEdited: function(text) { gridWidgetRoot.setHeaderSetting("glyphText", text) }
+        onHideToggled: gridWidgetRoot.setHeaderSetting("glyphHidden", !gridWidgetRoot.glyphHidden)
+      }
 
       Text {
         text: "GRID SIZE"
@@ -380,10 +549,12 @@ WidgetCard {
     // Header Row
     RowLayout {
       Layout.fillWidth: true
+      visible: gridWidgetRoot.headerShown
       spacing: Style.space(8)
 
       Text {
-        text: gridWidgetRoot.pickerOpen ? "" : ""
+        visible: gridWidgetRoot.pickerOpen || !gridWidgetRoot.glyphHidden
+        text: gridWidgetRoot.pickerOpen ? "" : gridWidgetRoot.shownGlyph
         font.family: Style.font.family
         font.pixelSize: 14
         color: Color.accent
@@ -391,7 +562,10 @@ WidgetCard {
 
       Text {
         Layout.fillWidth: true
-        text: gridWidgetRoot.pickerOpen ? "Add App to Quick Launch" : "Quick Launch"
+        // Keeps its slot (as a spacer) when hidden, so edit-mode buttons
+        // stay right-aligned.
+        opacity: gridWidgetRoot.pickerOpen || !gridWidgetRoot.titleHidden ? 1 : 0
+        text: gridWidgetRoot.pickerOpen ? "Add App to " + gridWidgetRoot.shownTitle : gridWidgetRoot.shownTitle
         font.family: Style.font.family
         font.pixelSize: 13
         font.weight: Font.Bold
