@@ -6,6 +6,9 @@ import Quickshell.Io
 import qs.Commons
 import qs.Ui
 
+import "../../shared"
+import ".."
+
 WidgetCard {
   id: realmWidgetRoot
 
@@ -298,7 +301,7 @@ WidgetCard {
   }
 
   readonly property string scriptPath: {
-    var u = Qt.resolvedUrl("../get-random-game.sh").toString()
+    var u = Qt.resolvedUrl("get-random-game.sh").toString()
     return decodeURIComponent(u.replace(/^file:\/\//, ""))
   }
 

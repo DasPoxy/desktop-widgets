@@ -7,6 +7,9 @@ import Quickshell.Io
 import qs.Commons
 import qs.Ui
 
+import "../../shared"
+import ".."
+
 WidgetCard {
   id: videoWidgetRoot
 
@@ -195,7 +198,7 @@ WidgetCard {
   property bool menuHoldsKeyboard: false
 
   readonly property string youtubeScriptPath: {
-    var u = Qt.resolvedUrl("../get-youtube.sh").toString()
+    var u = Qt.resolvedUrl("get-youtube.sh").toString()
     return decodeURIComponent(u.replace(/^file:\/\//, ""))
   }
 
@@ -323,7 +326,7 @@ WidgetCard {
   }
 
   readonly property string videoScriptPath: {
-    var u = Qt.resolvedUrl("../get-video.sh").toString()
+    var u = Qt.resolvedUrl("get-video.sh").toString()
     return decodeURIComponent(u.replace(/^file:\/\//, ""))
   }
 

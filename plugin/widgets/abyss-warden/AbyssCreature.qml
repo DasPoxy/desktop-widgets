@@ -1,5 +1,8 @@
 import QtQuick
 
+import "../../shared"
+import ".."
+
 // ---------------------------------------------------------------------------
 // 👻 Abyss Creature -- the extra Buddy Types: jellyfish, flying saucer (with
 // an alien inside), ghost, djinn, floating skull, a handsome squid-man, a

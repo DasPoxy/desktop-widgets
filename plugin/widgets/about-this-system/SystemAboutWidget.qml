@@ -6,6 +6,9 @@ import Quickshell.Io
 import qs.Commons
 import qs.Ui
 
+import "../../shared"
+import ".."
+
 WidgetCard {
   id: aboutWidgetRoot
 
@@ -129,7 +132,7 @@ WidgetCard {
   ])
 
   readonly property string aboutScriptPath: {
-    var u = Qt.resolvedUrl("../get-about.sh").toString()
+    var u = Qt.resolvedUrl("get-about.sh").toString()
     return decodeURIComponent(u.replace(/^file:\/\//, ""))
   }
 

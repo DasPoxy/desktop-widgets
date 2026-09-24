@@ -5,6 +5,9 @@ import Quickshell.Io
 import qs.Commons
 import qs.Ui
 
+import "../../shared"
+import ".."
+
 // Horizon Clock & Weather -- a fork of HeroClockWidget.qml that sits on
 // WidgetCard (so it can be resized like the other widgets) and scales all of
 // its text to fit, centred, inside whatever box it's given. Font family is
@@ -122,7 +125,7 @@ WidgetCard {
   readonly property bool weatherShown: showWeather && (weatherTemp !== "" || weatherDesc !== "")
 
   readonly property string weatherScriptPath: {
-    var u = Qt.resolvedUrl("../get-weather.sh").toString()
+    var u = Qt.resolvedUrl("../../get-weather.sh").toString()
     return decodeURIComponent(u.replace(/^file:\/\//, ""))
   }
 

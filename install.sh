@@ -67,7 +67,30 @@ else
   echo "     Everything else was installed." >&2
 fi
 
-chmod +x "$PLUGIN"/get-*.sh 2>/dev/null || true
+# 3. Old flat locations from before each widget got its own widgets/<slug>/
+# folder (upstream's layout). Left behind they'd be dead duplicates, so move
+# them into the backup -- but never touch a path upstream itself tracks.
+LEGACY=(
+  get-about.sh get-abyss-watch.sh get-agents.sh get-lyrics-translation.sh
+  get-lyrics.sh get-mute.sh get-random-game.sh get-suite-update.sh
+  get-sysmon.sh get-video.sh get-youtube.sh
+  widgets/AbyssBeholder.qml widgets/AbyssCreature.qml widgets/AbyssEye.qml
+  widgets/AbyssEyes.qml widgets/AbyssWardenWidget.qml widgets/AppGridWidget.qml
+  widgets/GridLines.qml widgets/HeaderEditor.qml widgets/HorizonClockWidget.qml
+  widgets/MprisPlayerWidget.qml widgets/RealmPortalWidget.qml
+  widgets/SuiteUpdateItem.qml widgets/SystemAboutWidget.qml
+  widgets/SystemMonitorWidget.qml widgets/ThemePalette.qml
+  widgets/VideoPlayerWidget.qml
+)
+for f in "${LEGACY[@]}"; do
+  [[ -e $PLUGIN/$f ]] || continue
+  git -C "$PLUGIN" ls-files --error-unmatch -- "$f" >/dev/null 2>&1 && continue
+  backup "$f"
+  rm -f "$PLUGIN/$f"
+  echo "  moved   $f (now under widgets/<widget>/, shared/ or scripts/)"
+done
+
+chmod +x "$PLUGIN"/get-*.sh "$PLUGIN"/scripts/*.sh "$PLUGIN"/widgets/*/*.sh 2>/dev/null || true
 
 # Record what's installed, for the widgets' "Check for Updates" menu item.
 VERSION_FILE="${XDG_STATE_HOME:-$HOME/.local/state}/omarchy/desktop-widgets-version"

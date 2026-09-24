@@ -6,6 +6,9 @@ import Quickshell.Io
 import qs.Commons
 import qs.Ui
 
+import "../../shared"
+import ".."
+
 WidgetCard {
   id: monWidgetRoot
 
@@ -110,7 +113,7 @@ WidgetCard {
   }
 
   readonly property string agentsScriptPath: {
-    var u = Qt.resolvedUrl("../get-agents.sh").toString()
+    var u = Qt.resolvedUrl("get-agents.sh").toString()
     return decodeURIComponent(u.replace(/^file:\/\//, ""))
   }
 
@@ -218,7 +221,7 @@ WidgetCard {
   }
 
   readonly property string sysmonScriptPath: {
-    var u = Qt.resolvedUrl("../get-sysmon.sh").toString()
+    var u = Qt.resolvedUrl("get-sysmon.sh").toString()
     return decodeURIComponent(u.replace(/^file:\/\//, ""))
   }
 

@@ -5,6 +5,9 @@ import Quickshell.Io
 import qs.Commons
 import qs.Ui
 
+import "../../shared"
+import ".."
+
 WidgetCard {
   id: gridWidgetRoot
 
@@ -116,7 +119,7 @@ WidgetCard {
   Component.onCompleted: applySavedSettings()
 
   readonly property string appsScriptPath: {
-    var u = Qt.resolvedUrl("../get-apps.sh").toString()
+    var u = Qt.resolvedUrl("../../get-apps.sh").toString()
     return decodeURIComponent(u.replace(/^file:\/\//, ""))
   }
 

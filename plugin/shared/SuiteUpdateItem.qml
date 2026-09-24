@@ -7,7 +7,7 @@ import qs.Commons
 // ⬇️ Suite Update -- the "Check for Updates" row at the bottom of every
 // custom widget's right-click menu. Checks the desktop-widgets repo against
 // what's installed and, on a second click, pulls and installs the whole
-// suite, then the shell reloads (see get-suite-update.sh).
+// suite, then the shell reloads (see scripts/get-suite-update.sh).
 // ---------------------------------------------------------------------------
 ColumnLayout {
   id: suiteUpdate
@@ -21,7 +21,7 @@ ColumnLayout {
   spacing: Style.space(2)
 
   readonly property string scriptPath: {
-    var u = Qt.resolvedUrl("../get-suite-update.sh").toString()
+    var u = Qt.resolvedUrl("../scripts/get-suite-update.sh").toString()
     return decodeURIComponent(u.replace(/^file:\/\//, ""))
   }
 

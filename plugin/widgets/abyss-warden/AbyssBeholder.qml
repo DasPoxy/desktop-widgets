@@ -1,5 +1,8 @@
 import QtQuick
 
+import "../../shared"
+import ".."
+
 // ---------------------------------------------------------------------------
 // 🐙 Abyss Beholder -- the "Beholder" form: a round little monster with one
 // big central eye (the chosen eye/iris style), a toothy grin, and a crown of

@@ -66,8 +66,8 @@
         "h": 400
       },
       "horizon_clock": {
-        "x": 860,
-        "y": 80,
+        "x": 840,
+        "y": 60,
         "w": 880,
         "h": 280
       },
@@ -76,18 +76,31 @@
         "y": 840,
         "w": 360,
         "h": 540
+      },
+      "abyss_warden": {
+        "x": 1200,
+        "y": 340,
+        "w": 180,
+        "h": 138
+      },
+      "app_launcher": {
+        "x": 1100,
+        "y": 400,
+        "w": 380,
+        "h": 420
       }
     },
     "enabled_widgets": [
-      "system_monitor",
-      "app_grid",
+      "realm_portal",
       "quick_notes",
-      "git_activity",
+      "abyss_warden",
+      "system_about",
       "horizon_clock",
       "mpris_player",
-      "realm_portal",
+      "system_monitor",
+      "git_activity",
       "video_player",
-      "system_about"
+      "app_grid"
     ],
     "widget_settings": {
       "git_activity": {
@@ -105,7 +118,9 @@
       "video_player": {
         "volume": 0.8482700892857146,
         "muted": false,
-        "hideWhenPaused": true
+        "hideWhenPaused": true,
+        "loopVideo": true,
+        "revealZone": "bar"
       },
       "clock": {
         "is24Hour": false,
@@ -124,7 +139,8 @@
         "lyricsOffsets": {},
         "lyricsFontScale": 1.75,
         "showLyrics": true,
-        "themeColors": true
+        "themeColors": true,
+        "translateLang": "en"
       },
       "app_grid": {
         "pinnedApps": [
@@ -238,13 +254,42 @@
           }
         ],
         "gridCols": 5,
-        "themeColors": true
+        "themeColors": true,
+        "glyphHidden": false,
+        "titleHidden": false,
+        "glyphText": "",
+        "gridMode": true
       },
       "horizon_clock": {
         "useCelsius": false,
         "is24Hour": false,
         "showGreeting": false,
-        "compactDate": true
+        "compactDate": true,
+        "themeColors": false
+      },
+      "system_monitor": {
+        "themeColors": true
+      },
+      "abyss_warden": {
+        "themeId": "system",
+        "floating": true,
+        "showCard": false,
+        "eyeStyle": "toon",
+        "pair": true,
+        "openSections": {
+          "style": false,
+          "iris": false,
+          "theme": false,
+          "buddy": true,
+          "behaviour": false
+        },
+        "irisStyle": "madness",
+        "form": "beholder",
+        "themeColors": true,
+        "buddyMode": false
+      },
+      "system_about": {
+        "gridMode": true
       }
     },
     "monitor_positions": {},

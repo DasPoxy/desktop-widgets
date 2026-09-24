@@ -1,5 +1,8 @@
 import QtQuick
 
+import "../../shared"
+import ".."
+
 // ---------------------------------------------------------------------------
 // 👁️ Abyss Eye -- one anime-style eye drawn on a Canvas. Pure view: the
 // Abyss Warden widget drives gaze/openness/pupil; this only paints them.

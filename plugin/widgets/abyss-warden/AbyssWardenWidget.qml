@@ -7,6 +7,9 @@ import Quickshell.Services.Mpris
 import qs.Commons
 import qs.Ui
 
+import "../../shared"
+import ".."
+
 // ---------------------------------------------------------------------------
 // 👁️ Abyss Warden -- an anime eye that only shows itself while the screen is
 // being recorded (Omarchy's recorder, other CLI recorders, or any portal
@@ -344,7 +347,7 @@ WidgetCard {
   property real lastCursorMove: 0
 
   readonly property string watchScriptPath: {
-    var u = Qt.resolvedUrl("../get-abyss-watch.sh").toString()
+    var u = Qt.resolvedUrl("get-abyss-watch.sh").toString()
     return decodeURIComponent(u.replace(/^file:\/\//, ""))
   }
 

@@ -7,6 +7,9 @@ import Quickshell.Services.Mpris
 import qs.Commons
 import qs.Ui
 
+import "../../shared"
+import ".."
+
 WidgetCard {
   id: mprisRoot
 
@@ -424,7 +427,7 @@ WidgetCard {
   readonly property string trackKey: hasPlayer ? (playerIdentity(activePlayer) + "\n" + (activePlayer.trackArtist || "") + "\n" + (activePlayer.trackTitle || "")) : ""
 
   readonly property string lyricsScriptPath: {
-    var u = Qt.resolvedUrl("../get-lyrics.sh").toString()
+    var u = Qt.resolvedUrl("get-lyrics.sh").toString()
     return decodeURIComponent(u.replace(/^file:\/\//, ""))
   }
 
@@ -509,7 +512,7 @@ WidgetCard {
   readonly property string translationKey: (lyricsStatus === "ok" && translateLang !== "" && showTranslation)
     ? trackKey + "\n" + translateLang + "\n" + lyricsLines.length : ""
   readonly property string translateScriptPath: {
-    var u = Qt.resolvedUrl("../get-lyrics-translation.sh").toString()
+    var u = Qt.resolvedUrl("get-lyrics-translation.sh").toString()
     return decodeURIComponent(u.replace(/^file:\/\//, ""))
   }
 
@@ -617,7 +620,7 @@ WidgetCard {
   property real volumeBeforeMute: 1
 
   readonly property string muteScriptPath: {
-    var u = Qt.resolvedUrl("../get-mute.sh").toString()
+    var u = Qt.resolvedUrl("get-mute.sh").toString()
     return decodeURIComponent(u.replace(/^file:\/\//, ""))
   }
 

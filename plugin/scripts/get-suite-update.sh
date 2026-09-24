@@ -2,9 +2,9 @@
 # Self-updater for the custom desktop-widgets suite (the "Check for Updates"
 # item in each custom widget's right-click menu).
 #
-#   get-suite-update.sh check   -> is the repo ahead of what's installed?
-#   get-suite-update.sh apply   -> pull the repo, run its install.sh, then
-#                                  reload the shell so the new QML loads
+#   scripts/get-suite-update.sh check   -> is the repo ahead of what's installed?
+#   scripts/get-suite-update.sh apply   -> pull the repo, run its install.sh, then
+#                                          reload the shell so the new QML loads
 #
 # Prints one JSON line:
 #   {"status": "current", "local": sha}

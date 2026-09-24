@@ -20,7 +20,7 @@ QtObject {
       icon: "\uf017",
       badge: "Resizable",
       description: "Hero Clock & Weather, resizable: the time, date, greeting and weather scale to fit centred in whatever size you drag it to. Pick any installed Nerd Font from the right-click menu.",
-      componentUrl: Qt.resolvedUrl("HorizonClockWidget.qml")
+      componentUrl: Qt.resolvedUrl("horizon-clock/HorizonClockWidget.qml")
     },
     {
       id: "gallery",
@@ -164,7 +164,7 @@ QtObject {
       icon: "\uf03d",
       badge: "Looping",
       description: "Browse and select a video to play looping on the desktop, with play/pause, mute, and a volume slider.",
-      componentUrl: Qt.resolvedUrl("VideoPlayerWidget.qml")
+      componentUrl: Qt.resolvedUrl("video-player/VideoPlayerWidget.qml")
     },
     {
       id: "mpris_player",
@@ -173,7 +173,7 @@ QtObject {
       icon: "\uf130",
       badge: "Karaoke",
       description: "Wireframe spinning-record player for any MPRIS source with karaoke-style synced lyrics (beside or below the controls), seekable progress, shuffle/loop, a live cava spectrum, and a source switcher. Scales from compact to wall-sized.",
-      componentUrl: Qt.resolvedUrl("MprisPlayerWidget.qml")
+      componentUrl: Qt.resolvedUrl("karaoke-player/MprisPlayerWidget.qml")
     },
     {
       id: "realm_portal",
@@ -182,7 +182,7 @@ QtObject {
       icon: "\ueefa",
       badge: "Custom",
       description: "One button: picks a random installed game from Steam, Heroic, or Lutris and launches it.",
-      componentUrl: Qt.resolvedUrl("RealmPortalWidget.qml")
+      componentUrl: Qt.resolvedUrl("visit-another-realm/RealmPortalWidget.qml")
     },
     {
       id: "abyss_warden",
@@ -192,7 +192,7 @@ QtObject {
       badge: "Watcher",
       badges: ["Watcher", "Custom"],
       description: "An anime eye that only appears while your screen is being recorded (Omarchy recorder, OBS, screen shares). It follows the mouse, glances at windows that change, and blinks. One eye or a pair, 9 eye styles, can float freely around the screen; 10 eye themes or your system theme.",
-      componentUrl: Qt.resolvedUrl("AbyssWardenWidget.qml")
+      componentUrl: Qt.resolvedUrl("abyss-warden/AbyssWardenWidget.qml")
     },
     {
       id: "system_about",
@@ -201,7 +201,7 @@ QtObject {
       icon: "\uf05a",
       badge: "fastfetch",
       description: "fastfetch/Omarchy-style system summary (host, CPU, GPU, OS, uptime) plus the active theme's color palette as swatches.",
-      componentUrl: Qt.resolvedUrl("SystemAboutWidget.qml")
+      componentUrl: Qt.resolvedUrl("about-this-system/SystemAboutWidget.qml")
     },
     {
       id: "system_monitor",
@@ -210,7 +210,7 @@ QtObject {
       icon: "\uf200",
       badge: "Live",
       description: "Live CPU, GPU, and RAM utilization meters plus network activity with session-total upload/download counters.",
-      componentUrl: Qt.resolvedUrl("SystemMonitorWidget.qml")
+      componentUrl: Qt.resolvedUrl("system-monitor/SystemMonitorWidget.qml")
     },
     {
       id: "app_grid",
@@ -219,7 +219,7 @@ QtObject {
       icon: "\uf00a",
       badge: "Paged",
       description: "Pin apps into a 3\u00d73, 4\u00d74, or 5\u00d75 quick-launch grid, with extra pages once it fills up.",
-      componentUrl: Qt.resolvedUrl("AppGridWidget.qml")
+      componentUrl: Qt.resolvedUrl("quick-launch-grid/AppGridWidget.qml")
     }
   ]
 

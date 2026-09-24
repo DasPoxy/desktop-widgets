@@ -1,5 +1,8 @@
 import QtQuick
 
+import "../../shared"
+import ".."
+
 // ---------------------------------------------------------------------------
 // 👀 Abyss Eyes -- the Buddy Type: one eye, a pair set like a face (left eye
 // mirrored, about half an eye-width apart), the Beholder (AbyssBeholder.qml)
