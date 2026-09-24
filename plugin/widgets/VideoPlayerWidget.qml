@@ -41,13 +41,34 @@ WidgetCard {
   // ---------------------------------------------------------------------------
   // 👻 Hide While Paused (right-click toggle): the whole card -- frame,
   // shadow and all -- fades out while a loaded video isn't playing, and fades
-  // back in while the cursor is over its area. Opacity (not visible) so the
+  // back in while the cursor is over its reveal zone. Opacity (not visible) so the
   // hover handler keeps receiving events on the invisible card.
   // ---------------------------------------------------------------------------
+  //
+  // Reappear zone (right-click, while Hide While Paused is on): hovering the
+  // whole panel, just its centre, or just the bottom control-bar strip brings
+  // it back. Once back, it stays while the cursor is anywhere on the panel,
+  // so reaching for a button doesn't make it vanish again.
+  property string revealZone: "panel"   // panel | center | bar
+  readonly property bool zoneHovered: revealZone === "center" ? centerHoverHandler.hovered
+    : (revealZone === "bar" ? bottomHoverHandler.hovered : panelHoverHandler.hovered)
+  property bool revealLatched: false
+  onZoneHoveredChanged: if (zoneHovered) revealLatched = true
+  Connections {
+    target: panelHoverHandler
+    function onHoveredChanged() { if (!panelHoverHandler.hovered) videoWidgetRoot.revealLatched = false }
+  }
+
+  function setRevealZone(z) {
+    videoWidgetRoot.revealZone = z
+    videoWidgetRoot.saveSetting("revealZone", z)
+  }
+
   readonly property bool pausedHidden: videoWidgetRoot.hideWhenPaused
     && player.hasVideo
     && player.playbackState !== MediaPlayer.PlayingState
-    && !panelHoverHandler.hovered
+    && !videoWidgetRoot.zoneHovered
+    && !(videoWidgetRoot.revealLatched && panelHoverHandler.hovered)
     && !videoWidgetRoot.contextMenuOpen
     && !videoWidgetRoot.isFullscreen
     && !videoWidgetRoot.barPressed
@@ -251,6 +272,7 @@ WidgetCard {
     muted = getSetting("muted", false)
     loopVideo = getSetting("loopVideo", true)
     hideWhenPaused = getSetting("hideWhenPaused", false)
+    revealZone = getSetting("revealZone", "panel")
     // A cached YouTube file can be pruned out of the cache (or the cache
     // cleared); fetch it again rather than showing "couldn't play".
     if (youtubeUrl.length > 0 && videoPath.length > 0 && !ytLoading) ytExistsCheck.running = true
@@ -612,9 +634,55 @@ WidgetCard {
           anchors.fill: parent
           hoverEnabled: true
           cursorShape: Qt.PointingHandCursor
-          onClicked: {
-            videoWidgetRoot.toggleHideWhenPaused()
-            videoWidgetRoot.contextMenuOpen = false
+          // Menu stays open so the reappear-zone choice below can be set.
+          onClicked: videoWidgetRoot.toggleHideWhenPaused()
+        }
+      }
+
+      // Where the hidden card listens for the cursor to come back.
+      RowLayout {
+        visible: videoWidgetRoot.hideWhenPaused
+        Layout.fillWidth: true
+        Layout.leftMargin: Style.space(8)
+        Layout.rightMargin: 4
+        spacing: Style.space(4)
+
+        Text {
+          text: "Reappear on"
+          font.family: Style.font.family
+          font.pixelSize: 10
+          color: Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.6)
+        }
+
+        Repeater {
+          model: [{ id: "panel", label: "Panel" }, { id: "center", label: "Center" }, { id: "bar", label: "Controls" }]
+
+          Rectangle {
+            required property var modelData
+            readonly property bool isActive: videoWidgetRoot.revealZone === modelData.id
+            Layout.fillWidth: true
+            implicitHeight: 24
+            radius: 6
+            color: isActive ? Qt.rgba(Color.accent.r, Color.accent.g, Color.accent.b, 0.3) : (zoneMouse.containsMouse ? Qt.rgba(1, 1, 1, 0.1) : Qt.rgba(1, 1, 1, 0.05))
+            border.color: isActive ? Color.accent : "transparent"
+            border.width: 1
+
+            Text {
+              anchors.centerIn: parent
+              text: modelData.label
+              font.family: Style.font.family
+              font.pixelSize: 10
+              font.weight: parent.isActive ? Font.Bold : Font.Normal
+              color: parent.isActive ? Color.accent : Color.foreground
+            }
+
+            MouseArea {
+              id: zoneMouse
+              anchors.fill: parent
+              hoverEnabled: true
+              cursorShape: Qt.PointingHandCursor
+              onClicked: videoWidgetRoot.setRevealZone(modelData.id)
+            }
           }
         }
       }
@@ -758,6 +826,14 @@ WidgetCard {
     HoverHandler {
       id: panelHoverHandler
       onHoveredChanged: videoWidgetRoot.updateKeyboardFocusForHover()
+    }
+
+    // Centre reveal zone (see revealZone): the middle ~45% of the panel.
+    Item {
+      anchors.centerIn: parent
+      width: parent.width * 0.45
+      height: parent.height * 0.45
+      HoverHandler { id: centerHoverHandler }
     }
 
     VideoOutput {
