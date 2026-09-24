@@ -95,7 +95,7 @@ WidgetCard {
   }
   // Switching form reshapes the widget around it (same height, width to
   // suit), so the eyes stay about the same size.
-  readonly property var formAspect: ({ one: 1.65, pair: 2.6, beholder: 1.3, jelly: 0.74, saucer: 1.14, ghost: 0.88, djinn: 0.71, skull: 0.92 })
+  readonly property var formAspect: ({ one: 1.65, pair: 2.6, beholder: 1.3, jelly: 0.74, saucer: 1.14, ghost: 0.88, djinn: 0.71, skull: 0.92, squid: 0.74, unicorn: 0.92 })
 
   // Buddy Types, in menu order (drawing: AbyssEyes / AbyssBeholder /
   // AbyssCreature).
@@ -107,7 +107,9 @@ WidgetCard {
     { id: "saucer", name: "Saucer" },
     { id: "ghost", name: "Ghost" },
     { id: "djinn", name: "Djinn" },
-    { id: "skull", name: "Skull" }
+    { id: "skull", name: "Skull" },
+    { id: "squid", name: "Handsome" },
+    { id: "unicorn", name: "Smug Unicorn" }
   ]
   function reshapeForForm() {
     var a = formAspect[form] || 1.65
@@ -203,7 +205,17 @@ WidgetCard {
     { id: "glass", name: "Glass" },
     { id: "arcs", name: "Arcs" },
     { id: "eclipse", name: "Eclipse" },
-    { id: "streaks", name: "Streaks" }
+    { id: "streaks", name: "Streaks" },
+    { id: "infinity", name: "Infinity" },
+    // Evil / manic set.
+    { id: "bloodmoon", name: "Blood Moon" },
+    { id: "void", name: "Void" },
+    { id: "twitch", name: "Twitch" },
+    { id: "cracked", name: "Cracked" },
+    { id: "goat", name: "Goat" },
+    { id: "hellfire", name: "Hellfire" },
+    { id: "blackout", name: "Blackout" },
+    { id: "madness", name: "Madness" }
   ]
 
   function setEyeStyle(id) {
@@ -228,7 +240,14 @@ WidgetCard {
     { id: "toon", name: "Toon" },
     { id: "fox", name: "Fox" },
     { id: "dome", name: "Dome" },
-    { id: "doll", name: "Doll" }
+    { id: "doll", name: "Doll" },
+    { id: "sixeyes", name: "Six Eyes" },
+    // Evil / manic set.
+    { id: "sinister", name: "Sinister" },
+    { id: "manic", name: "Manic" },
+    { id: "yandere", name: "Yandere" },
+    { id: "demon", name: "Demon" },
+    { id: "berserk", name: "Berserk" }
   ]
 
   function setTheme(id) {

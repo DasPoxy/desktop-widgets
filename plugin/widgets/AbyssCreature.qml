@@ -2,11 +2,14 @@ import QtQuick
 
 // ---------------------------------------------------------------------------
 // 👻 Abyss Creature -- the extra Buddy Types: jellyfish, flying saucer (with
-// an alien inside), ghost, djinn and floating skull. Each is a flat riso-
+// an alien inside), ghost, djinn, floating skull, a handsome squid-man and a
+// smug unicorn. Each is a flat riso-
 // style body on a Canvas (fills, hard shadow + halftone, ink outline) with
 // live AbyssEyes placed on it, bobbing gently. Colours come from the eye
 // theme: body = print colour (`glow`), pale parts = sclera, shadows =
-// scleraShade, ink = lash.
+// scleraShade, ink = lash. The two character buddies keep their own skin
+// colours (lightly tinted by the theme) and get heavy half-lids drawn over
+// their eyes on a second Canvas above them.
 //
 // Drawing happens in "creature units": the creature's box is extentW x
 // extentH units, centred on (0, 0), scaled to fit the item.
@@ -14,7 +17,7 @@ import QtQuick
 Item {
   id: creature
 
-  property string kind: "ghost"   // jelly | saucer | ghost | djinn | skull
+  property string kind: "ghost"   // jelly | saucer | ghost | djinn | skull | squid | unicorn
   property string styleId: "classic"
   property string irisStyle: "auto"
   property var theme: ({})
@@ -36,7 +39,8 @@ Item {
   // [width, height, vertical centre] of each creature's drawing, in units.
   readonly property var extents: ({
     jelly: [1.0, 1.36, 0.06], saucer: [1.35, 1.18, 0.04], ghost: [0.98, 1.12, -0.02],
-    djinn: [1.0, 1.4, -0.01], skull: [0.98, 1.06, -0.03]
+    djinn: [1.0, 1.4, -0.01], skull: [0.98, 1.06, -0.03],
+    squid: [1.0, 1.36, 0.04], unicorn: [1.4, 1.52, -0.07]
   })
   readonly property var ext: extents[kind] || [1, 1, 0]
   readonly property real unitPx: Math.max(1, Math.min(width / ext[0], height / ext[1]) * 0.94)
@@ -52,6 +56,8 @@ Item {
       case "ghost": return [[-0.14, -0.2, 0.3, 0.23, true], [0.14, -0.2, 0.3, 0.23, false]]
       case "djinn": return [[-0.075, -0.4, 0.16, 0.12, true], [0.075, -0.4, 0.16, 0.12, false]]
       case "skull": return [[-0.155, -0.1, 0.26, 0.2, true], [0.155, -0.1, 0.26, 0.2, false]]
+      case "squid": return [[-0.165, -0.15, 0.32, 0.25, true], [0.165, -0.15, 0.32, 0.25, false]]
+      case "unicorn": return [[-0.16, -0.17, 0.27, 0.19, true], [0.18, -0.18, 0.29, 0.2, false]]
     }
     return []
   }
@@ -64,6 +70,9 @@ Item {
     var q = Qt.color(c)
     return "rgba(" + Math.round(q.r * 255) + "," + Math.round(q.g * 255) + "," + Math.round(q.b * 255) + "," + (q.a * a) + ")"
   }
+  // The character buddies' own colours, nudged a little toward the theme.
+  function skinOf(base, amount) { return Qt.tint(base, Qt.alpha(col("glow", "#2a9d8f"), amount || 0.18)) }
+  readonly property bool hasLids: kind === "squid" || kind === "unicorn"
 
   Canvas {
     id: body
@@ -99,6 +108,15 @@ Item {
       ctx.lineCap = "round"
 
       function ink(w) { ctx.strokeStyle = lash; ctx.lineWidth = w || lw; ctx.stroke() }
+      function star4(x, y, r) {
+        ctx.beginPath()
+        ctx.moveTo(x, y - r)
+        ctx.quadraticCurveTo(x + r * 0.15, y - r * 0.15, x + r * 0.8, y)
+        ctx.quadraticCurveTo(x + r * 0.15, y + r * 0.15, x, y + r)
+        ctx.quadraticCurveTo(x - r * 0.15, y + r * 0.15, x - r * 0.8, y)
+        ctx.quadraticCurveTo(x - r * 0.15, y - r * 0.15, x, y - r)
+        ctx.closePath()
+      }
       function fill(c) { ctx.fillStyle = c; ctx.fill() }
       function dotsBand(cxp, cyp, r0, a0, a1, color) {
         // A halftone fade just inside a shadow edge (arc from a0 to a1).
@@ -321,6 +339,135 @@ Item {
           ctx.beginPath(); ctx.moveTo(txp, 0.17); ctx.lineTo(txp, 0.27 + chat * 0.5); ink(0.01)
         }
         ctx.beginPath(); ctx.moveTo(-0.18, 0.22 + chat * 0.5); ctx.lineTo(0.18, 0.22 + chat * 0.5); ink(0.012)
+      } else if (creature.kind === "squid") {
+        // Handsome squid-man: shirt collar, thin neck, a huge bald dome of a
+        // head over a chiselled jaw, pouty pink lips. (Nose, lids and brows
+        // go on the overlay, in front of the eyes.)
+        var skin = creature.skinOf("#a3d4bf")
+        var skinDark = Qt.darker(skin, 1.28)
+        var shirt = creature.skinOf("#b06a2c", 0.12)
+        ctx.beginPath()
+        ctx.moveTo(-0.46, 0.7); ctx.quadraticCurveTo(-0.4, 0.5, -0.12, 0.47)
+        ctx.lineTo(0, 0.6); ctx.lineTo(0.12, 0.47)
+        ctx.quadraticCurveTo(0.4, 0.5, 0.46, 0.7); ctx.closePath()
+        fill(shirt); ink()
+        ctx.beginPath(); ctx.moveTo(-0.08, 0.4); ctx.lineTo(-0.08, 0.56); ctx.lineTo(0, 0.6); ctx.lineTo(0.08, 0.56); ctx.lineTo(0.08, 0.4); ctx.closePath()
+        fill(skinDark); ink(0.016)
+        var squidHead = function() {
+          ctx.beginPath()
+          ctx.moveTo(-0.2, 0.46)
+          ctx.quadraticCurveTo(-0.31, 0.42, -0.3, 0.12)
+          ctx.bezierCurveTo(-0.3, -0.04, -0.46, -0.16, -0.44, -0.36)
+          ctx.bezierCurveTo(-0.42, -0.7, 0.42, -0.7, 0.44, -0.36)
+          ctx.bezierCurveTo(0.46, -0.16, 0.3, -0.04, 0.3, 0.12)
+          ctx.quadraticCurveTo(0.31, 0.42, 0.2, 0.46)
+          ctx.quadraticCurveTo(0, 0.51, -0.2, 0.46)
+          ctx.closePath()
+        }
+        celShade(squidHead, skin, skinDark, -0.1, -0.26, 0.66)
+        squidHead(); ink()
+        // Dome sheen, forehead lines, cheekbones, chin cleft.
+        ctx.beginPath(); ctx.arc(-0.1, -0.36, 0.2, Math.PI * 1.15, Math.PI * 1.5)
+        ctx.strokeStyle = rgba(hl, 0.7); ctx.lineWidth = 0.03; ctx.stroke()
+        ctx.beginPath(); ctx.moveTo(-0.16, -0.36); ctx.quadraticCurveTo(0, -0.4, 0.16, -0.36); ink(0.012)
+        ctx.beginPath(); ctx.moveTo(-0.12, -0.31); ctx.quadraticCurveTo(0, -0.34, 0.12, -0.31); ink(0.012)
+        ctx.beginPath(); ctx.moveTo(-0.27, 0.06); ctx.quadraticCurveTo(-0.22, 0.2, -0.24, 0.3); ink(0.012)
+        ctx.beginPath(); ctx.moveTo(0.27, 0.06); ctx.quadraticCurveTo(0.22, 0.2, 0.24, 0.3); ink(0.012)
+        ctx.beginPath(); ctx.moveTo(0, 0.44); ctx.lineTo(0, 0.48); ink(0.012)
+        // Lips: a full pout under the nose.
+        var lip = creature.skinOf("#e59aa6", 0.1)
+        ctx.beginPath()
+        ctx.moveTo(-0.1, 0.33)
+        ctx.bezierCurveTo(-0.07, 0.27, -0.03, 0.27, 0, 0.3)
+        ctx.bezierCurveTo(0.03, 0.27, 0.07, 0.27, 0.1, 0.33)
+        ctx.bezierCurveTo(0.07, 0.41, -0.07, 0.41, -0.1, 0.33)
+        ctx.closePath()
+        fill(lip); ink(0.016)
+        ctx.beginPath(); ctx.moveTo(-0.09, 0.33); ctx.quadraticCurveTo(0, 0.35, 0.09, 0.33); ink(0.012)
+        ctx.beginPath(); ctx.ellipse(-0.04, 0.35, 0.05, 0.02); fill(rgba(hl, 0.6))
+      } else if (creature.kind === "unicorn") {
+        // Smug unicorn: mane streaming out behind, ears, a spiral horn, a long
+        // snout with nostrils and buck teeth, and a knowing little smile.
+        var coat = creature.skinOf("#f6efdd", 0.05)
+        var coatDark = Qt.darker(coat, 1.16)
+        var mane = creature.skinOf("#dce86a", 0.15)
+        var peach = creature.skinOf("#efb99c", 0.1)
+        // Twinkles.
+        var twk = [[-0.54, -0.56, 0.06, 0], [0.6, -0.64, 0.05, 2.1], [0.58, 0.46, 0.055, 4.2], [-0.6, -0.2, 0.035, 1.3]]
+        for (var tw = 0; tw < twk.length; tw++) {
+          var tws = 0.55 + 0.45 * Math.sin(t * 2.2 + twk[tw][3])
+          star4(twk[tw][0], twk[tw][1], twk[tw][2] * tws); fill(rgba(hl, 0.9))
+        }
+        // Mane, flowing out to the right.
+        var sway = Math.sin(t * 1.3) * 0.03
+        ctx.beginPath()
+        ctx.moveTo(-0.05, -0.5)
+        ctx.bezierCurveTo(0.25, -0.62, 0.5, -0.5, 0.66, -0.36 + sway)
+        ctx.bezierCurveTo(0.56, -0.3, 0.64, -0.18 + sway, 0.62, -0.06 + sway)
+        ctx.bezierCurveTo(0.54, -0.1, 0.56, 0.06, 0.5, 0.2 + sway)
+        ctx.lineTo(0.38, 0.1)
+        ctx.lineTo(0.3, -0.4)
+        ctx.closePath()
+        fill(mane); ink()
+        ctx.beginPath(); ctx.moveTo(0.2, -0.5); ctx.quadraticCurveTo(0.42, -0.46, 0.56, -0.3 + sway); ink(0.012)
+        // Neck.
+        ctx.beginPath()
+        ctx.moveTo(0.0, 0.3); ctx.quadraticCurveTo(-0.04, 0.5, -0.06, 0.68)
+        ctx.lineTo(0.44, 0.68); ctx.quadraticCurveTo(0.44, 0.4, 0.42, 0.1); ctx.closePath()
+        fill(coatDark); ink()
+        // Ears.
+        // Leaf-shaped ears, each side bulging outward on its way to the tip.
+        var ear = function(bx, tipX, tipY, half, bulge) {
+          ctx.beginPath()
+          ctx.moveTo(bx - half, -0.37)
+          ctx.quadraticCurveTo((bx - half + tipX) / 2 - bulge, (-0.37 + tipY) / 2, tipX, tipY)
+          ctx.quadraticCurveTo((bx + half + tipX) / 2 + bulge, (-0.39 + tipY) / 2, bx + half, -0.39)
+          ctx.closePath()
+        }
+        ear(-0.24, -0.42, -0.64, 0.09, 0.05); fill(coat); ink()
+        ear(-0.25, -0.4, -0.6, 0.04, 0.02); fill(peach)
+        ear(0.3, 0.5, -0.66, 0.09, 0.05); fill(coat); ink()
+        ear(0.31, 0.48, -0.62, 0.04, 0.02); fill(peach)
+        // Head: forehead, long snout down to the lower left, big jowl.
+        var uniHead = function() {
+          ctx.beginPath()
+          ctx.moveTo(-0.34, -0.36)
+          ctx.bezierCurveTo(-0.2, -0.47, 0.25, -0.48, 0.4, -0.34)
+          ctx.bezierCurveTo(0.5, -0.2, 0.47, 0.05, 0.42, 0.14)
+          ctx.bezierCurveTo(0.34, 0.34, 0.1, 0.4, -0.12, 0.4)
+          ctx.bezierCurveTo(-0.3, 0.44, -0.46, 0.5, -0.58, 0.4)
+          ctx.bezierCurveTo(-0.68, 0.3, -0.64, 0.16, -0.58, 0.08)
+          ctx.bezierCurveTo(-0.5, -0.06, -0.4, -0.2, -0.34, -0.36)
+          ctx.closePath()
+        }
+        celShade(uniHead, coat, coatDark, -0.12, -0.22, 0.64)
+        uniHead(); ink()
+        // Horn: a peach-banded spike.
+        ctx.beginPath(); ctx.moveTo(-0.08, -0.43); ctx.lineTo(0.0, -0.8); ctx.lineTo(0.09, -0.44); ctx.closePath()
+        fill(coat); ink()
+        ctx.save()
+        ctx.beginPath(); ctx.moveTo(-0.08, -0.43); ctx.lineTo(0.0, -0.8); ctx.lineTo(0.09, -0.44); ctx.closePath()
+        ctx.clip()
+        ctx.fillStyle = peach
+        for (var hb = 0; hb < 4; hb++) {
+          var hy = -0.47 - hb * 0.085
+          ctx.beginPath(); ctx.moveTo(-0.12, hy); ctx.lineTo(0.12, hy - 0.05); ctx.lineTo(0.12, hy - 0.08); ctx.lineTo(-0.12, hy - 0.03); ctx.closePath(); ctx.fill()
+        }
+        ctx.restore()
+        ctx.beginPath(); ctx.moveTo(-0.08, -0.43); ctx.lineTo(0.0, -0.8); ctx.lineTo(0.09, -0.44); ctx.closePath(); ink()
+        // Nostrils, buck-toothed lips, the smug smile.
+        ctx.fillStyle = peach
+        ctx.beginPath(); ctx.ellipse(-0.56, 0.1, 0.04, 0.05); ctx.fill()
+        ctx.beginPath(); ctx.ellipse(-0.44, 0.13, 0.04, 0.045); ctx.fill()
+        ctx.beginPath(); ctx.moveTo(-0.6, 0.3); ctx.bezierCurveTo(-0.57, 0.26, -0.52, 0.26, -0.5, 0.29)
+        ctx.bezierCurveTo(-0.47, 0.26, -0.42, 0.27, -0.4, 0.31); ink(0.016)
+        ctx.beginPath(); ctx.moveTo(-0.58, 0.31); ctx.quadraticCurveTo(-0.5, 0.34, -0.41, 0.32); ink(0.014)
+        ctx.beginPath(); ctx.rect(-0.55, 0.305, 0.045, 0.04); fill(hl); ink(0.01)
+        ctx.beginPath(); ctx.rect(-0.505, 0.305, 0.045, 0.04); fill(hl); ink(0.01)
+        ctx.beginPath(); ctx.moveTo(-0.56, 0.36); ctx.quadraticCurveTo(-0.5, 0.39, -0.43, 0.35); ink(0.014)
+        ctx.beginPath(); ctx.moveTo(-0.52, 0.42); ctx.quadraticCurveTo(-0.5, 0.44, -0.48, 0.42); ink(0.01)
+        ctx.beginPath(); ctx.moveTo(-0.1, 0.17); ctx.quadraticCurveTo(0.05, 0.24, 0.18, 0.14); ink(0.016)
+        ctx.beginPath(); ctx.moveTo(0.17, 0.16); ctx.lineTo(0.2, 0.1); ink(0.014)
       }
       ctx.restore()
     }
@@ -345,6 +492,102 @@ Item {
       pupilScale: creature.pupilScale
       glow: 0
       irisGlow: creature.irisGlow
+    }
+  }
+
+  // In front of the eyes: the character buddies' heavy half-lids (they drop
+  // shut with a blink), brows and the squid-man's nose.
+  Canvas {
+    id: front
+    anchors.fill: parent
+    visible: creature.hasLids
+
+    Connections {
+      target: creature
+      enabled: creature.hasLids
+      function onTChanged() { front.requestPaint() }
+      function onThemeChanged() { front.requestPaint() }
+      function onKindChanged() { front.requestPaint() }
+      function onOpennessChanged() { front.requestPaint() }
+      function onWidthChanged() { front.requestPaint() }
+      function onHeightChanged() { front.requestPaint() }
+    }
+
+    onPaint: {
+      var ctx = getContext("2d")
+      ctx.reset()
+      ctx.clearRect(0, 0, width, height)
+      if (!creature.hasLids) return
+      var S = creature.unitPx
+      var lash = creature.col("lash", "#1c1f3f")
+      var squid = creature.kind === "squid"
+      var skin = squid ? creature.skinOf("#a3d4bf") : creature.skinOf("#f6efdd", 0.05)
+      var o = Math.max(0, Math.min(1, creature.openness))
+      ctx.save()
+      ctx.translate(creature.cx, creature.cy)
+      ctx.scale(S, S)
+      ctx.lineJoin = "round"
+      ctx.lineCap = "round"
+      function ink(w) { ctx.strokeStyle = lash; ctx.lineWidth = w; ctx.stroke() }
+
+      var slots = creature.eyeSlots
+      for (var i = 0; i < slots.length; i++) {
+        var x = slots[i][0], y = slots[i][1], w = slots[i][2], h = slots[i][3]
+        var out = slots[i][4] ? -1 : 1          // which way the outer corner is
+        var hw = w * 0.44
+        // Lid edge, as a fraction down the eye box: heavy when open, all the
+        // way down when shut.
+        var edge = y - h / 2 + h * (squid ? 0.5 + 0.18 * (1 - o) : 0.46 + 0.22 * (1 - o))
+        var sag = h * (squid ? 0.1 : 0.14)
+        ctx.beginPath()
+        ctx.moveTo(x - hw, y - h * 0.62)
+        ctx.lineTo(x + hw, y - h * 0.62)
+        ctx.lineTo(x + hw, edge + (out > 0 ? h * 0.04 : 0))
+        ctx.quadraticCurveTo(x, edge + sag, x - hw, edge + (out < 0 ? h * 0.04 : 0))
+        ctx.closePath()
+        ctx.fillStyle = skin
+        ctx.fill()
+        // Lid line, and a lash flick at the outer corner for the unicorn.
+        ctx.beginPath()
+        ctx.moveTo(x - hw * 0.92, edge + (out < 0 ? h * 0.04 : 0) + sag * 0.12)
+        ctx.quadraticCurveTo(x, edge + sag * 1.02, x + hw * 0.92, edge + (out > 0 ? h * 0.04 : 0) + sag * 0.12)
+        ink(squid ? 0.022 : 0.018)
+        if (!squid) {
+          var ox = x + out * hw * 0.92, oy = edge + h * 0.04 + sag * 0.12
+          ctx.beginPath(); ctx.moveTo(ox, oy); ctx.quadraticCurveTo(ox + out * 0.04, oy - 0.01, ox + out * 0.07, oy - 0.03); ink(0.014)
+          // Arched brow, and a tired line under the eye.
+          ctx.beginPath(); ctx.moveTo(x - hw * 0.8, y - h * 0.62); ctx.quadraticCurveTo(x, y - h * 0.95, x + hw * 0.9, y - h * 0.66); ink(0.012)
+          ctx.beginPath(); ctx.moveTo(x - hw * 0.3, y + h * 0.62); ctx.quadraticCurveTo(x, y + h * 0.7, x + hw * 0.35, y + h * 0.6); ink(0.01)
+        } else {
+          // Heavy brow ridge.
+          ctx.beginPath(); ctx.moveTo(x - hw, y - h * 0.5); ctx.quadraticCurveTo(x, y - h * 0.78, x + hw, y - h * 0.52); ink(0.016)
+        }
+      }
+
+      if (squid) {
+        // The nose: long and droopy, hanging from between the eyes.
+        var nose = function() {
+          ctx.beginPath()
+          ctx.moveTo(-0.035, -0.17)
+          ctx.bezierCurveTo(-0.05, -0.02, -0.12, 0.1, -0.1, 0.19)
+          ctx.bezierCurveTo(-0.08, 0.27, 0.08, 0.27, 0.1, 0.19)
+          ctx.bezierCurveTo(0.12, 0.1, 0.05, -0.02, 0.035, -0.17)
+          ctx.closePath()
+        }
+        nose(); ctx.fillStyle = skin; ctx.fill()
+        // Shadow down its right side, then the outline and a sheen.
+        ctx.beginPath()
+        ctx.moveTo(0.035, -0.17)
+        ctx.bezierCurveTo(0.05, -0.02, 0.12, 0.1, 0.1, 0.19)
+        ctx.bezierCurveTo(0.08, 0.25, 0.02, 0.26, 0.02, 0.26)
+        ctx.bezierCurveTo(0.07, 0.18, 0.04, 0.02, 0.02, -0.17)
+        ctx.closePath()
+        ctx.fillStyle = Qt.darker(skin, 1.28); ctx.fill()
+        nose(); ink(0.02)
+        ctx.beginPath(); ctx.moveTo(-0.05, 0.08); ctx.quadraticCurveTo(-0.075, 0.14, -0.06, 0.2)
+        ctx.strokeStyle = creature.rgba(creature.col("highlight", "#fff7ea"), 0.7); ctx.lineWidth = 0.018; ctx.stroke()
+      }
+      ctx.restore()
     }
   }
 }

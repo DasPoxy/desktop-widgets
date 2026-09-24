@@ -48,11 +48,16 @@ Canvas {
   // Slow rotation for the spinning irises (Sharingan/Mangekyō); only ticks
   // while one is shown and the eye is open.
   property real spinAngle: 0
-  readonly property real spinSpeed: (irisStyles[irisStyle] && irisStyles[irisStyle].spin) || 0
+  // Unwrapped seconds of spin time (for tics that shouldn't loop).
+  property real spinClock: 0
+  readonly property var shownIris: irisStyles[irisStyle]
+    || (styles[styleId] && styles[styleId].autoIris ? irisStyles[styles[styleId].autoIris] : null)
+  readonly property real spinSpeed: (shownIris && shownIris.spin) || 0
   FrameAnimation {
     running: eye.spinSpeed > 0 && eye.visible && eye.openness > 0.05
     onTriggered: {
       eye.spinAngle = (eye.spinAngle + frameTime * eye.spinSpeed) % (Math.PI * 2)
+      eye.spinClock += frameTime
       eye.requestPaint()
     }
   }
@@ -74,6 +79,8 @@ Canvas {
   //   lashes        [[t along lid, length]]; lower = count of lower lashes
   //   crease        double-lid line; brow: none | arc | angled | flat, browY
   //   top/bot       drawing extents (lashes, brow, glow) for fitting
+  //   autoIris      iris style used for "Match Eye"; paleLashes: white lashes
+  //   shadow        dark band hanging off the upper lid; bloodshot: red veins
   // ---------------------------------------------------------------------------
   readonly property var styles: ({
     classic: { inner: 0.03, outer: -0.04, upY: -0.49, up1: -0.28, up2: 0.18, loY: 0.31, lo1: 0.2, lo2: -0.26, closedY: 0.17,
@@ -124,7 +131,30 @@ Canvas {
       lashW: 0.055, wing: 0.04, lashes: [[0.72, 0.08], [0.84, 0.08]], lower: 0, brow: "arc", browY: -0.72, top: -0.84, bot: 0.2 },
     doll: { inner: 0.04, outer: -0.02, upY: -0.64, up1: -0.3, up2: 0.26, loY: 0.52, lo1: 0.26, lo2: -0.3, closedY: 0.2,
       iris: 0.27, irisRy: 1.2, irisY: 0.04, pupil: "tall", pupilR: 0.42, highlight: "big",
-      lashW: 0.05, wing: 0.06, lashes: [[0.15, 0.1], [0.3, 0.12], [0.45, 0.13], [0.6, 0.13], [0.75, 0.13], [0.88, 0.12]], lower: 6, brow: "none", top: -0.7, bot: 0.56 }
+      lashW: 0.05, wing: 0.06, lashes: [[0.15, 0.1], [0.3, 0.12], [0.45, 0.13], [0.6, 0.13], [0.75, 0.13], [0.88, 0.12]], lower: 6, brow: "none", top: -0.7, bot: 0.56 },
+    // Wide awakened eye with pale lashes; its own iris is Infinity
+    // (`autoIris` = the iris style "Match Eye" uses).
+    sixeyes: { inner: 0.08, outer: 0.0, upY: -0.66, up1: -0.3, up2: 0.24, loY: 0.5, lo1: 0.28, lo2: -0.3, closedY: 0.2,
+      iris: 0.25, irisRy: 1.02, irisY: 0.02, pupil: "round", pupilR: 0.2, highlight: "none", autoIris: "infinity", paleLashes: true,
+      lashW: 0.06, wing: 0.1, lashes: [[0.12, 0.07], [0.24, 0.09], [0.36, 0.1], [0.48, 0.11], [0.6, 0.12], [0.72, 0.13], [0.84, 0.13], [0.94, 0.1]],
+      lower: 5, crease: true, brow: "none", top: -0.74, bot: 0.54 },
+    // Evil / manic set. `shadow` = a dark band hanging from the upper lid
+    // over the eye (the shadowed-eyes look); `bloodshot` = red veins.
+    sinister: { inner: 0.14, outer: -0.16, upY: -0.2, up1: -0.25, up2: 0.2, loY: 0.26, lo1: 0.25, lo2: -0.25, closedY: 0.05,
+      iris: 0.19, irisRy: 1.05, irisY: 0.06, pupil: "pin", pupilR: 0.3, highlight: "none", shadow: 0.1,
+      lashW: 0.08, wing: 0.1, lashes: [[0.9, 0.06]], lower: 0, brow: "angled", browY: -0.34, top: -0.5, bot: 0.3 },
+    manic: { inner: 0.0, outer: -0.02, upY: -0.7, up1: -0.32, up2: 0.28, loY: 0.6, lo1: 0.28, lo2: -0.32, closedY: 0.22,
+      iris: 0.12, irisRy: 1.0, irisY: -0.02, pupil: "pin", pupilR: 0.3, highlight: "tiny", bloodshot: true,
+      lashW: 0.035, wing: 0, lashes: [[0.2, 0.08], [0.5, 0.1], [0.8, 0.09]], lower: 5, brow: "arc", browY: -0.78, top: -0.86, bot: 0.6 },
+    yandere: { inner: 0.08, outer: 0.04, upY: -0.62, up1: -0.3, up2: 0.24, loY: -0.02, lo1: 0.24, lo2: -0.26, closedY: 0.03,
+      iris: 0.2, irisRy: 1.05, irisY: -0.16, pupil: "pin", pupilR: 0.3, highlight: "none", shadow: 0.15,
+      lashW: 0.06, wing: 0.06, lashes: [[0.7, 0.09], [0.82, 0.1], [0.92, 0.09]], lower: 0, brow: "none", top: -0.58, bot: 0.14 },
+    demon: { inner: 0.1, outer: -0.18, upY: -0.34, up1: -0.22, up2: 0.22, loY: 0.22, lo1: 0.28, lo2: -0.2, closedY: 0.0, angular: true,
+      iris: 0.2, irisRy: 1.2, irisY: 0.03, pupil: "slit", pupilR: 0.3, highlight: "soft",
+      lashW: 0.07, wing: 0.2, lashes: [[0.55, 0.1], [0.72, 0.12], [0.88, 0.12]], lower: 0, brow: "angled", browY: -0.46, top: -0.62, bot: 0.24 },
+    berserk: { inner: 0.06, outer: -0.06, upY: -0.5, up1: -0.25, up2: 0.25, loY: 0.46, lo1: 0.28, lo2: -0.3, closedY: 0.18,
+      iris: 0.14, irisRy: 1.0, irisY: 0.0, pupil: "pin", pupilR: 0.35, highlight: "none", bloodshot: true, shadow: 0.08,
+      lashW: 0.07, wing: 0.08, lashes: [], lower: 2, crease: true, brow: "angled", browY: -0.5, top: -0.64, bot: 0.46 }
   })
 
   // Iris styles: pattern (cel | rings | petal | spiral | hollow | crosshair |
@@ -163,7 +193,18 @@ Canvas {
     glass: { pattern: "glass", pupil: "round", pupilR: 0.2, highlight: "none" },
     arcs: { pattern: "arcs", pupil: "none", pupilR: 0, highlight: "big" },
     eclipse: { pattern: "eclipse", pupil: "none", pupilR: 0, highlight: "classic" },
-    streaks: { pattern: "streaks", pupil: "none", pupilR: 0, highlight: "none" }
+    streaks: { pattern: "streaks", pupil: "none", pupilR: 0, highlight: "none" },
+    // Six Eyes: ice-blue, white-streaked, a dark rim and a lit pupil.
+    infinity: { pattern: "infinity", pupil: "round", pupilR: 0.2, pupilDot: true, highlight: "none", spin: 0.12, colors: { iris: "#3aa6e6", irisDark: "#0a2f6b", irisLight: "#c8f4ff", pupil: "#071634" } },
+    // Evil / manic set. `twitch` jerks the iris about in little tics.
+    bloodmoon: { pattern: "bloodmoon", pupil: "round", pupilR: 0.14, highlight: "tiny", colors: { iris: "#b3121f", irisDark: "#3d0309", irisLight: "#ff5a4f", pupil: "#120204" } },
+    void: { pattern: "void", pupil: "round", pupilR: 0.13, highlight: "none", colors: { iris: "#140a0d", irisDark: "#000000", irisLight: "#ff2a3a", pupil: "#ff2a3a" } },
+    twitch: { pattern: "twitch", pupil: "round", pupilR: 0.16, highlight: "tiny", spin: 5, twitch: true },
+    cracked: { pattern: "cracked", pupil: "round", pupilR: 0.18, highlight: "soft" },
+    goat: { pattern: "cel", pupil: "goat", pupilR: 0.36, highlight: "soft", colors: { iris: "#e0a526", irisDark: "#7a4a08", irisLight: "#ffe28a", pupil: "#140c02" } },
+    hellfire: { pattern: "flames", pupil: "slit", pupilR: 0.2, highlight: "tiny", spin: 1, colors: { iris: "#ff6a1a", irisDark: "#6e0d04", irisLight: "#ffd24a", pupil: "#140402" } },
+    blackout: { pattern: "blackout", pupil: "round", pupilR: 0.84, highlight: "tiny" },
+    madness: { pattern: "madness", pupil: "round", pupilR: 0.1, highlight: "none", spin: 2.5 }
   })
 
   function col(key, fallback) {
@@ -298,12 +339,39 @@ Canvas {
     for (var g = 0; g < 110; g++) grain.push([rand() - 0.5, rand() * 0.9 - 0.5, 0.003 + rand() * 0.004])
     dots(grain, rgba(lash, 0.12))
 
+    // Bloodshot: forked red veins creeping in from both corners.
+    if (st.bloodshot) {
+      ctx.strokeStyle = rgba("#d0263c", 0.75)
+      ctx.lineCap = "round"
+      var veins = [[-0.5, Ly, 1], [0.5, Ry, -1]]
+      for (var vn = 0; vn < 2; vn++) {
+        for (var vb2 = 0; vb2 < 3; vb2++) {
+          var vx0 = veins[vn][0], vy0 = veins[vn][1] + (vb2 - 1) * 0.06, vd2 = veins[vn][2]
+          var vlen = 0.2 + rand() * 0.1, vang = (vb2 - 1) * 0.35 + (rand() - 0.5) * 0.3
+          var px = vx0, py = vy0
+          ctx.lineWidth = 0.014
+          ctx.beginPath()
+          ctx.moveTo(px, py)
+          for (var vs2 = 1; vs2 <= 5; vs2++) {
+            px += vd2 * vlen / 5
+            py += Math.sin(vang) * vlen / 5 + (rand() - 0.5) * 0.03
+            ctx.lineTo(px, py)
+            if (vs2 === 3) {
+              var fx2 = px + vd2 * 0.06, fy2 = py + (rand() - 0.5) * 0.1
+              ctx.moveTo(px, py); ctx.lineTo(fx2, fy2); ctx.moveTo(px, py)
+            }
+          }
+          ctx.stroke()
+        }
+      }
+    }
+
     // Size and resting spot come from the eye style (so any iris fits any
     // eye); the pattern, pupil and highlights come from the iris style, or
     // from the eye style's own defaults when set to "auto".
     var R = st.iris, ry = st.irisRy
-    var irs = irisStyles[irisStyle]
-    var autoIris = !irs
+    var autoIris = !irisStyles[irisStyle]
+    var irs = shownIris
     // A chosen iris grows to what this eye's opening can hold (never below
     // the eye style's own size), so a detailed pattern still reads in a
     // small-iris style like Shocked. The auto iris keeps the style's size.
@@ -311,13 +379,23 @@ Canvas {
       var opening = (st.loY - st.upY) * 0.75
       R = Math.max(R, Math.min(0.26, 0.42 * opening / ry))
     }
-    if (autoIris) irs = { pattern: st.rings ? "rings" : "cel", pupil: st.pupil, pupilR: st.pupilR, highlight: st.highlight, rings: st.rings }
+    if (!irs) irs = { pattern: st.rings ? "rings" : "cel", pupil: st.pupil, pupilR: st.pupilR, highlight: st.highlight, rings: st.rings }
     // Themes with slit pupils (serpent, dragon) keep them on the auto iris.
-    var pupilShape = (autoIris && col("slit", false)) ? "slit" : irs.pupil
+    var pupilShape = (autoIris && !st.autoIris && col("slit", false)) ? "slit" : irs.pupil
 
     var gx = Math.max(-1, Math.min(1, gazeX)) * (mirrored ? -1 : 1)
     var ix = gx * Math.max(0.12, 0.5 - R - 0.02)
     var iy = st.irisY + Math.max(-1, Math.min(1, gazeY)) * 0.12
+    // Twitch: every so often the iris jerks off-centre for a beat.
+    if (irs.twitch) {
+      var tick = Math.floor(spinClock * 6.5) + (mirrored ? 17 : 0)
+      var h1 = Math.abs(Math.sin(tick * 12.9898) * 43758.5453) % 1
+      var h2 = Math.abs(Math.sin(tick * 78.233) * 12543.113) % 1
+      if (h1 > 0.45) {
+        ix += (h2 - 0.5) * R * 0.5
+        iy += (h1 - 0.72) * R * 0.4
+      }
+    }
 
     // --- Iris (drawn in a vertically stretched frame for oval irises)
     ctx.save()
@@ -608,6 +686,130 @@ Canvas {
         ctx.lineTo(sx2 * R, half)
         ctx.stroke()
       }
+    } else if (pat === "infinity") {
+      // Six Eyes: fine white streaks shot through ice blue, a deep rim, a
+      // dark ring round the pupil and a shaft of light across it all.
+      crescent(0.45)
+      ring(R * 0.87, R * 0.2, rgba(irisDark, 0.9))
+      var iseed = mirrored ? 911 : 4242
+      function irand() { iseed = (iseed * 16807) % 2147483647; return (iseed - 1) / 2147483646 }
+      ctx.lineCap = "round"
+      for (var is = 0; is < 48; is++) {
+        var isa = irand() * Math.PI * 2 + spinAngle, ir0 = R * (0.32 + irand() * 0.14), ir1 = R * (0.55 + irand() * 0.37)
+        ctx.strokeStyle = is % 3 ? rgba(irisLight, 0.8) : rgba(irisDark, 0.75)
+        ctx.lineWidth = R * (0.014 + irand() * 0.022)
+        ctx.beginPath()
+        ctx.moveTo(Math.cos(isa) * ir0, Math.sin(isa) * ir0)
+        ctx.lineTo(Math.cos(isa) * ir1, Math.sin(isa) * ir1)
+        ctx.stroke()
+      }
+      ring(R * 0.3, R * 0.11, irisDark)
+      ctx.fillStyle = rgba(col("highlight", "#fff7ea"), 0.85)
+      ctx.beginPath()
+      ctx.moveTo(-hs * R * 0.18, -R * 0.03)
+      ctx.lineTo(-hs * R * 0.95, -R * 0.24)
+      ctx.lineTo(-hs * R * 0.97, R * 0.02)
+      ctx.closePath()
+      ctx.fill()
+    } else if (pat === "bloodmoon") {
+      // Blood moon: dark cracks radiating from a ringed pinprick.
+      cap(true); crescent(0.7)
+      ctx.strokeStyle = irisDark
+      ctx.lineCap = "round"
+      ctx.lineWidth = R * 0.045
+      for (var bm = 0; bm < 12; bm++) {
+        var bma = bm / 12 * Math.PI * 2 + 0.13
+        ctx.beginPath()
+        ctx.moveTo(Math.cos(bma) * R * 0.3, Math.sin(bma) * R * 0.3)
+        ctx.lineTo(Math.cos(bma) * R * (0.6 + (bm % 2) * 0.24), Math.sin(bma) * R * (0.6 + (bm % 2) * 0.24))
+        ctx.stroke()
+      }
+      ring(R * 0.3, R * 0.07, irisDark)
+    } else if (pat === "void") {
+      // Void: a black disc with a burning pinprick and faint red rings.
+      ring(R * 0.8, R * 0.03, rgba(irisLight, 0.75))
+      ring(R * 0.52, R * 0.02, rgba(irisLight, 0.35))
+      ring(R * 0.2, R * 0.12, rgba(irisLight, 0.3))
+    } else if (pat === "twitch") {
+      // Twitchy: shaky, uneven rings round a pinprick.
+      cap(false); crescent(1)
+      ctx.strokeStyle = lash
+      ctx.lineWidth = R * 0.04
+      for (var tw = 0; tw < 3; tw++) {
+        ctx.beginPath()
+        for (var twa = 0; twa <= 40; twa++) {
+          var ta2 = twa / 40 * Math.PI * 2
+          var tr = R * (0.36 + 0.17 * tw) * (1 + 0.07 * Math.sin(ta2 * (5 + tw * 2) + tw * 2.1))
+          if (twa === 0) ctx.moveTo(Math.cos(ta2) * tr, Math.sin(ta2) * tr)
+          else ctx.lineTo(Math.cos(ta2) * tr, Math.sin(ta2) * tr)
+        }
+        ctx.stroke()
+      }
+    } else if (pat === "cracked") {
+      // Cracked: jagged fractures splintering out from the pupil.
+      cap(true); crescent(1)
+      var cseed = 2718
+      function crand() { cseed = (cseed * 16807) % 2147483647; return (cseed - 1) / 2147483646 }
+      ctx.strokeStyle = lash
+      ctx.lineWidth = R * 0.035
+      ctx.lineJoin = "miter"
+      for (var ck = 0; ck < 7; ck++) {
+        var cka = ck / 7 * Math.PI * 2 + crand() * 0.5, ckr = R * 0.22
+        ctx.beginPath()
+        ctx.moveTo(Math.cos(cka) * ckr, Math.sin(cka) * ckr)
+        for (var cs = 0; cs < 4; cs++) {
+          ckr += R * 0.17
+          cka += (crand() - 0.5) * 0.5
+          ctx.lineTo(Math.cos(cka) * Math.min(ckr, R * 0.9), Math.sin(cka) * Math.min(ckr, R * 0.9))
+          if (cs === 1) {
+            var bra = cka + (crand() < 0.5 ? -0.5 : 0.5)
+            ctx.lineTo(Math.cos(bra) * ckr * 1.2, Math.sin(bra) * ckr * 1.2)
+            ctx.moveTo(Math.cos(cka) * ckr, Math.sin(cka) * ckr)
+          }
+        }
+        ctx.stroke()
+      }
+      ctx.lineJoin = "round"
+    } else if (pat === "flames") {
+      // Hellfire: flickering tongues of flame licking out from the pupil.
+      ctx.fillStyle = irisDark
+      ctx.beginPath(); ctx.arc(0, 0, R, 0, Math.PI * 2); ctx.fill()
+      function tongues(n, len, w, color, phase) {
+        ctx.fillStyle = color
+        for (var fk = 0; fk < n; fk++) {
+          var fa2 = fk / n * Math.PI * 2 + phase
+          var fl = R * (len + 0.2 * Math.sin(spinAngle * 4 + fk * 1.7 + phase))
+          var fw2 = Math.sin(spinAngle * 3 + fk) * 0.12
+          var b0 = polar(R * 0.15, fa2 - w), b1 = polar(R * 0.15, fa2 + w), ft = polar(fl, fa2 + fw2), fc = polar(fl * 0.6, fa2 + w * 0.3)
+          ctx.beginPath()
+          ctx.moveTo(b0[0], b0[1])
+          ctx.quadraticCurveTo(fc[0], fc[1], ft[0], ft[1])
+          ctx.quadraticCurveTo(polar(fl * 0.55, fa2 - w * 0.4)[0], polar(fl * 0.55, fa2 - w * 0.4)[1], b1[0], b1[1])
+          ctx.closePath()
+          ctx.fill()
+        }
+      }
+      tongues(12, 0.68, 0.3, ic.iris || col("iris", "#e8456b"), 0)
+      tongues(9, 0.42, 0.34, irisLight, 0.35)
+    } else if (pat === "blackout") {
+      // Blacked out: the pupil swallows nearly all of it; a thin rim is left.
+      crescent(1)
+      ring(R * 0.9, R * 0.04, rgba(irisLight, 0.8))
+    } else if (pat === "madness") {
+      // Madness: a double spiral that never stops turning.
+      crescent(0.6)
+      for (var arm = 0; arm < 2; arm++) {
+        ctx.strokeStyle = arm ? irisLight : lash
+        ctx.lineWidth = R * 0.085
+        ctx.lineCap = "round"
+        ctx.beginPath()
+        for (var ms = 0; ms <= 70; ms++) {
+          var mt = ms / 70, mr = R * (0.1 + 0.78 * mt), ma = -spinAngle * 2 + arm * Math.PI + mt * Math.PI * 3.6
+          if (ms === 0) ctx.moveTo(Math.cos(ma) * mr, Math.sin(ma) * mr)
+          else ctx.lineTo(Math.cos(ma) * mr, Math.sin(ma) * mr)
+        }
+        ctx.stroke()
+      }
     }
 
     // Buddy Mode recording glow, part one: the iris lights up from within in
@@ -648,8 +850,19 @@ Canvas {
       star(0, pr * 0.08, pr * 1.1, pr * 0.45, 5, ic.pupil || col("pupil", "#1c1f3f"))
     } else if (pupilShape === "sun") {
       star(0, 0, pr * 1.05, pr * 0.55, 8, ic.pupil || col("pupil", "#1c1f3f"))
+    } else if (pupilShape === "goat") {
+      // Goat: a wide, flat bar.
+      ctx.roundedRect(-pr * 1.4, -pr * 0.38, pr * 2.8, pr * 0.76, pr * 0.34, pr * 0.34)
+      ctx.fill()
     } else if (pupilShape !== "none") {
       ctx.arc(0, 0, pr, 0, Math.PI * 2)
+      ctx.fill()
+    }
+    // A point of light at the pupil's heart.
+    if (irs.pupilDot) {
+      ctx.fillStyle = col("highlight", "#fff7ea")
+      ctx.beginPath()
+      ctx.arc(0, 0, pr * 0.32, 0, Math.PI * 2)
       ctx.fill()
     }
 
@@ -705,6 +918,32 @@ Canvas {
       oval(ix - hs * R * 0.37, iy - Rv * 0.42, R * 0.5, Rv * 0.36)
       dot(ix + hs * R * 0.36, iy + Rv * 0.34, R * 0.1)
     }
+
+    // Shadowed eyes: a dark band hangs from the upper lid over the white and
+    // iris alike, fading out through halftone.
+    if (st.shadow) {
+      var shD = st.shadow * (0.5 + 0.5 * o)
+      var shCol = rgba(lash, 0.62)
+      ctx.fillStyle = shCol
+      ctx.beginPath()
+      ctx.moveTo(-0.7, -1.2)
+      ctx.lineTo(0.7, -1.2)
+      for (var sh = 24; sh >= 0; sh--) {
+        var sp3 = pointAt(up, sh / 24)
+        ctx.lineTo(sp3[0], sp3[1] + shD * Math.sin(Math.PI * (0.1 + 0.8 * sh / 24)))
+      }
+      ctx.closePath()
+      ctx.fill()
+      var shTone = []
+      for (var shr = 0; shr < 3; shr++) {
+        for (var shx = 0; shx <= 34; shx++) {
+          var sht = (shx + (shr % 2) * 0.5) / 34
+          var shp = pointAt(up, sht)
+          shTone.push([shp[0], shp[1] + shD * Math.sin(Math.PI * (0.1 + 0.8 * sht)) + 0.02 + shr * 0.026, 0.013 * (1 - shr / 3.4)])
+        }
+      }
+      dots(shTone, shCol)
+    }
     ctx.restore()
 
     // --- Ink: lid line (brush-thick toward the outer corner), wing, lashes
@@ -735,8 +974,10 @@ Canvas {
       ctx.fill()
     }
 
-    // Lashes as pointed brush flicks.
-    ctx.fillStyle = lash
+    // Lashes as pointed brush flicks (pale ones get a thin ink edge).
+    ctx.fillStyle = st.paleLashes ? col("highlight", "#fff7ea") : lash
+    ctx.strokeStyle = lash
+    ctx.lineWidth = 0.008
     var lb = Math.max(0.01, st.lashW * 0.32)
     for (var li = 0; li < st.lashes.length; li++) {
       var bp = pointAt(up, st.lashes[li][0])
@@ -748,6 +989,7 @@ Canvas {
       ctx.quadraticCurveTo(bp[0] + len * 0.4, bp[1] - len * 0.45 * o, bp[0] + lb, bp[1] + lb * 0.4)
       ctx.closePath()
       ctx.fill()
+      if (st.paleLashes) ctx.stroke()
     }
 
     // Double-lid crease.
