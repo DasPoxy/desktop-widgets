@@ -1,5 +1,51 @@
+diff --git a/components/WidgetSelector.qml b/components/WidgetSelector.qml
+index 6e42279..8b6cf6d 100644
+--- a/components/WidgetSelector.qml
++++ b/components/WidgetSelector.qml
+@@ -410,21 +410,27 @@ Item {
+                       elide: Text.ElideRight
+                     }
+ 
+-                    Rectangle {
+-                      visible: modelData.badge !== undefined
+-                      implicitWidth: badgeText.implicitWidth + 10
+-                      implicitHeight: 18
+-                      radius: 9
+-                      color: isAdded ? Qt.rgba(Color.accent.r, Color.accent.g, Color.accent.b, 0.2) : Qt.rgba(1, 1, 1, 0.1)
++                    // One pill per badge: `badges` (list) wins over the
++                    // single `badge` string.
++                    Repeater {
++                      model: modelData.badges || (modelData.badge !== undefined ? [modelData.badge] : [])
+ 
+-                      Text {
+-                        id: badgeText
+-                        anchors.centerIn: parent
+-                        text: modelData.badge || ""
+-                        font.family: Style.font.family
+-                        font.pixelSize: 9
+-                        font.weight: Font.DemiBold
+-                        color: isAdded ? Color.accent : Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.7)
++                      Rectangle {
++                        required property var modelData
++                        implicitWidth: badgeText.implicitWidth + 10
++                        implicitHeight: 18
++                        radius: 9
++                        color: isAdded ? Qt.rgba(Color.accent.r, Color.accent.g, Color.accent.b, 0.2) : Qt.rgba(1, 1, 1, 0.1)
++
++                        Text {
++                          id: badgeText
++                          anchors.centerIn: parent
++                          text: modelData || ""
++                          font.family: Style.font.family
++                          font.pixelSize: 9
++                          font.weight: Font.DemiBold
++                          color: isAdded ? Color.accent : Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.7)
++                        }
+                       }
+                     }
+                   }
 diff --git a/widgets/WidgetRegistry.qml b/widgets/WidgetRegistry.qml
-index 54e7986..0a8f675 100644
+index 54e7986..80e3beb 100644
 --- a/widgets/WidgetRegistry.qml
 +++ b/widgets/WidgetRegistry.qml
 @@ -13,6 +13,15 @@ QtObject {
@@ -18,7 +64,7 @@ index 54e7986..0a8f675 100644
      {
        id: "gallery",
        name: "3D Photo Deck Stack",
-@@ -147,6 +156,69 @@ QtObject {
+@@ -147,6 +156,70 @@ QtObject {
        badge: "Live Feeds",
        description: "News and article reader with customizable RSS/Atom feeds, channel tabs, and browser integration.",
        componentUrl: Qt.resolvedUrl("rss-feed/RssFeedWidget.qml")
@@ -56,6 +102,7 @@ index 54e7986..0a8f675 100644
 +      category: "Fun",
 +      icon: "󰈈",
 +      badge: "Watcher",
++      badges: ["Watcher", "Custom"],
 +      description: "An anime eye that only appears while your screen is being recorded (Omarchy recorder, OBS, screen shares). It follows the mouse, glances at windows that change, and blinks. Can float freely around the screen; 7 eye themes or your system theme.",
 +      componentUrl: Qt.resolvedUrl("AbyssWardenWidget.qml")
 +    },
