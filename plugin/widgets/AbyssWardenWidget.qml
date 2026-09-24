@@ -95,7 +95,7 @@ WidgetCard {
   }
   // Switching form reshapes the widget around it (same height, width to
   // suit), so the eyes stay about the same size.
-  readonly property var formAspect: ({ one: 1.65, pair: 2.6, beholder: 1.3, jelly: 0.74, saucer: 1.14, ghost: 0.88, djinn: 0.71, skull: 0.92, squid: 0.74, unicorn: 0.92 })
+  readonly property var formAspect: ({ one: 1.65, pair: 2.6, beholder: 1.3, jelly: 0.74, saucer: 1.14, ghost: 0.88, djinn: 0.71, skull: 0.92, squid: 0.74, unicorn: 0.92, robot: 0.8 })
 
   // Buddy Types, in menu order (drawing: AbyssEyes / AbyssBeholder /
   // AbyssCreature).
@@ -109,7 +109,8 @@ WidgetCard {
     { id: "djinn", name: "Djinn" },
     { id: "skull", name: "Skull" },
     { id: "squid", name: "Handsome" },
-    { id: "unicorn", name: "Smug Unicorn" }
+    { id: "unicorn", name: "Smug Unicorn" },
+    { id: "robot", name: "Robot" }
   ]
   function reshapeForForm() {
     var a = formAspect[form] || 1.65

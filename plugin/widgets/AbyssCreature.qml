@@ -2,8 +2,8 @@ import QtQuick
 
 // ---------------------------------------------------------------------------
 // 👻 Abyss Creature -- the extra Buddy Types: jellyfish, flying saucer (with
-// an alien inside), ghost, djinn, floating skull, a handsome squid-man and a
-// smug unicorn. Each is a flat riso-
+// an alien inside), ghost, djinn, floating skull, a handsome squid-man, a
+// smug unicorn and a jet-powered robot. Each is a flat riso-
 // style body on a Canvas (fills, hard shadow + halftone, ink outline) with
 // live AbyssEyes placed on it, bobbing gently. Colours come from the eye
 // theme: body = print colour (`glow`), pale parts = sclera, shadows =
@@ -17,7 +17,7 @@ import QtQuick
 Item {
   id: creature
 
-  property string kind: "ghost"   // jelly | saucer | ghost | djinn | skull | squid | unicorn
+  property string kind: "ghost"   // jelly | saucer | ghost | djinn | skull | squid | unicorn | robot
   property string styleId: "classic"
   property string irisStyle: "auto"
   property var theme: ({})
@@ -40,7 +40,7 @@ Item {
   readonly property var extents: ({
     jelly: [1.0, 1.36, 0.06], saucer: [1.35, 1.18, 0.04], ghost: [0.98, 1.12, -0.02],
     djinn: [1.0, 1.4, -0.01], skull: [0.98, 1.06, -0.03],
-    squid: [1.0, 1.36, 0.04], unicorn: [1.4, 1.52, -0.07]
+    squid: [1.0, 1.36, 0.04], unicorn: [1.4, 1.52, -0.07], robot: [1.08, 1.36, -0.02]
   })
   readonly property var ext: extents[kind] || [1, 1, 0]
   readonly property real unitPx: Math.max(1, Math.min(width / ext[0], height / ext[1]) * 0.94)
@@ -57,6 +57,7 @@ Item {
       case "djinn": return [[-0.075, -0.4, 0.16, 0.12, true], [0.075, -0.4, 0.16, 0.12, false]]
       case "skull": return [[-0.155, -0.1, 0.26, 0.2, true], [0.155, -0.1, 0.26, 0.2, false]]
       case "squid": return [[-0.165, -0.15, 0.32, 0.25, true], [0.165, -0.15, 0.32, 0.25, false]]
+      case "robot": return [[-0.14, -0.19, 0.29, 0.24, true], [0.14, -0.19, 0.29, 0.24, false]]
       case "unicorn": return [[-0.25, -0.15, 0.27, 0.19, true], [0.08, -0.17, 0.29, 0.2, false]]
     }
     return []
@@ -339,6 +340,75 @@ Item {
           ctx.beginPath(); ctx.moveTo(txp, 0.17); ctx.lineTo(txp, 0.27 + chat * 0.5); ink(0.01)
         }
         ctx.beginPath(); ctx.moveTo(-0.18, 0.22 + chat * 0.5); ctx.lineTo(0.18, 0.22 + chat * 0.5); ink(0.012)
+      } else if (creature.kind === "robot") {
+        // Flying robot: a boxy head with a dark visor screen (the eyes show
+        // on it), bolt ears, a blinking antenna, a little capsule body with
+        // waving arms, hovering on a flickering jet.
+        var metal = flesh, metalDark = fleshDark
+        var steel = Qt.darker(paleShade, 1.2)
+        var jet = Qt.tint("#ff9a3c", Qt.alpha(creature.col("iris", "#e8456b"), 0.3))
+        var boost = 1 + 0.35 * creature.irisGlow
+        // Jet flame: three nested teardrops, flickering.
+        function flame(w, len, color) {
+          ctx.beginPath()
+          ctx.moveTo(-w, 0.47)
+          ctx.quadraticCurveTo(-w * 0.9, 0.47 + len * 0.55, Math.sin(t * 9) * 0.01, 0.47 + len)
+          ctx.quadraticCurveTo(w * 0.9, 0.47 + len * 0.55, w, 0.47)
+          ctx.closePath()
+          fill(color)
+        }
+        var fl = (0.1 + 0.025 * Math.sin(t * 23) + 0.015 * Math.sin(t * 37)) * boost
+        flame(0.12, fl + 0.04, rgba(jet, 0.85))
+        flame(0.08, fl * 0.75, light)
+        flame(0.04, fl * 0.45, hl)
+        // Nozzle.
+        ctx.beginPath(); ctx.moveTo(-0.11, 0.38); ctx.lineTo(0.11, 0.38); ctx.lineTo(0.15, 0.48); ctx.lineTo(-0.15, 0.48); ctx.closePath()
+        fill(steel); ink()
+        ctx.beginPath(); ctx.moveTo(-0.13, 0.44); ctx.lineTo(0.13, 0.44); ink(0.012)
+        // Arms: shoulder -> elbow -> round hand, waving out of step.
+        for (var am = -1; am <= 1; am += 2) {
+          var wave = Math.sin(t * 2.2 + (am > 0 ? 0 : 1.6))
+          var ex = am * 0.34, ey = 0.26 + wave * 0.03
+          var hx2 = am * (0.4 + 0.03 * wave), hy2 = 0.14 - 0.1 * Math.max(0, wave) * (am > 0 ? 1 : 0.4)
+          ctx.beginPath(); ctx.moveTo(am * 0.2, 0.22); ctx.lineTo(ex, ey); ctx.lineTo(hx2, hy2)
+          ctx.lineWidth = 0.075; ctx.strokeStyle = lash; ctx.stroke()
+          ctx.lineWidth = 0.045; ctx.strokeStyle = steel; ctx.stroke()
+          ctx.beginPath(); ctx.arc(hx2, hy2, 0.05, 0, Math.PI * 2); fill(metal); ink(0.016)
+        }
+        // Body capsule with a pulsing chest light.
+        var torso2 = function() { ctx.beginPath(); ctx.roundedRect(-0.2, 0.12, 0.4, 0.29, 0.11, 0.11) }
+        celShade(torso2, metal, metalDark, -0.08, 0.12, 0.3)
+        torso2(); ink()
+        var beat = 0.6 + 0.4 * Math.max(0, Math.sin(t * 3.2))
+        ctx.beginPath(); ctx.arc(0, 0.26, 0.055, 0, Math.PI * 2); fill(pale); ink(0.014)
+        ctx.beginPath(); ctx.arc(0, 0.26, 0.036, 0, Math.PI * 2); fill(rgba(creature.col("iris", "#e8456b"), beat))
+        // Neck.
+        ctx.beginPath(); ctx.rect(-0.07, 0.07, 0.14, 0.07); fill(steel); ink(0.016)
+        // Antenna with a blinking tip.
+        ctx.beginPath(); ctx.moveTo(0, -0.46); ctx.quadraticCurveTo(0.01, -0.56, 0.05 + Math.sin(t * 2.5) * 0.015, -0.62); ink(0.018)
+        var blink = (Math.floor(t * 1.6) % 2) === 0
+        ctx.beginPath(); ctx.arc(0.05 + Math.sin(t * 2.5) * 0.015, -0.64, 0.035, 0, Math.PI * 2)
+        fill(blink ? creature.col("iris", "#e8456b") : Qt.darker(steel, 1.2)); ink(0.014)
+        // Bolt ears.
+        for (var er = -1; er <= 1; er += 2) {
+          ctx.beginPath(); ctx.arc(er * 0.44, -0.18, 0.075, 0, Math.PI * 2); fill(steel); ink()
+          ctx.beginPath(); ctx.arc(er * 0.44, -0.18, 0.035, 0, Math.PI * 2); fill(metalDark); ink(0.012)
+        }
+        // Head.
+        var botHead = function() { ctx.beginPath(); ctx.roundedRect(-0.42, -0.47, 0.84, 0.56, 0.14, 0.14) }
+        celShade(botHead, metal, metalDark, -0.14, -0.4, 0.62)
+        botHead(); ink()
+        // Rivets and a seam.
+        ctx.fillStyle = metalDark
+        var rv = [[-0.36, -0.41], [0.36, -0.41], [-0.36, 0.03], [0.36, 0.03]]
+        for (var ri = 0; ri < rv.length; ri++) { ctx.beginPath(); ctx.arc(rv[ri][0], rv[ri][1], 0.018, 0, Math.PI * 2); ctx.fill() }
+        // Visor: a dark screen with faint scanlines and a glassy glint.
+        ctx.beginPath(); ctx.roundedRect(-0.33, -0.37, 0.66, 0.36, 0.1, 0.1); fill(lash); ink(0.016)
+        ctx.strokeStyle = rgba(light, 0.1); ctx.lineWidth = 0.008
+        for (var sl2 = -0.34; sl2 < -0.03; sl2 += 0.03) { ctx.beginPath(); ctx.moveTo(-0.3, sl2); ctx.lineTo(0.3, sl2); ctx.stroke() }
+        ctx.beginPath(); ctx.moveTo(-0.26, -0.33); ctx.lineTo(-0.16, -0.33); ctx.lineTo(-0.26, -0.2); ctx.closePath(); fill(rgba(hl, 0.25))
+        // Speaker-grille mouth.
+        for (var gm = -2; gm <= 2; gm++) { ctx.beginPath(); ctx.moveTo(gm * 0.035, 0.015); ctx.lineTo(gm * 0.035, 0.055); ink(0.014) }
       } else if (creature.kind === "squid") {
         // Handsome squid-man: shirt collar, thin neck, a huge bald dome of a
         // head over a chiselled jaw, pouty pink lips. (Nose, lids and brows

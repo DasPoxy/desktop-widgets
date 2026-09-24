@@ -4,13 +4,13 @@ import QtQuick
 // 👀 Abyss Eyes -- the Buddy Type: one eye, a pair set like a face (left eye
 // mirrored, about half an eye-width apart), the Beholder (AbyssBeholder.qml)
 // or a creature (AbyssCreature.qml: jellyfish, saucer, ghost, djinn, skull,
-// squid-man, unicorn).
+// squid-man, unicorn, robot).
 // All share gaze, blinks and pupils, so a group always moves as one.
 // ---------------------------------------------------------------------------
 Item {
   id: eyes
 
-  property string form: "one"   // one | pair | beholder | jelly | saucer | ghost | djinn | skull | squid | unicorn
+  property string form: "one"   // one | pair | beholder | jelly | saucer | ghost | djinn | skull | squid | unicorn | robot
   readonly property bool pair: form === "pair"
   property string styleId: "classic"
   property string irisStyle: "auto"
@@ -75,7 +75,7 @@ Item {
     anchors.fill: parent
     animate: eyes.animate
     kind: eyes.form
-    visible: ["jelly", "saucer", "ghost", "djinn", "skull", "squid", "unicorn"].indexOf(eyes.form) >= 0
+    visible: ["jelly", "saucer", "ghost", "djinn", "skull", "squid", "unicorn", "robot"].indexOf(eyes.form) >= 0
     styleId: eyes.styleId
     irisStyle: eyes.irisStyle
     theme: eyes.theme
