@@ -114,7 +114,41 @@ WidgetCard {
     monWidgetRoot.saveSetting(key, monWidgetRoot[key])
   }
 
+  // Header: custom title / glyph, or hide either (HeaderEditor in the menu).
+  // Empty text = the default.
+  readonly property string defaultTitle: "System Monitor"
+  readonly property string defaultGlyph: ""
+  property string titleText: ""
+  property string glyphText: ""
+  property bool titleHidden: false
+  property bool glyphHidden: false
+  readonly property string shownTitle: titleText || defaultTitle
+  readonly property string shownGlyph: glyphText || defaultGlyph
+
+  function setHeaderSetting(key, val) {
+    monWidgetRoot[key] = val
+    monWidgetRoot.saveSetting(key, val)
+  }
+
+  // Menu text fields need keyboard focus on the desktop layer.
+  property bool holdsKeyboardFocus: false
+  function grabKeyboard(input) {
+    if (rootRef && "keyboardFocusRequested" in rootRef) rootRef.keyboardFocusRequested = true
+    monWidgetRoot.holdsKeyboardFocus = true
+    input.forceActiveFocus()
+  }
+  function releaseKeyboard() {
+    if (!monWidgetRoot.holdsKeyboardFocus) return
+    monWidgetRoot.holdsKeyboardFocus = false
+    if (rootRef && rootRef.keyboardFocusRequested) rootRef.keyboardFocusRequested = false
+  }
+  onContextMenuOpenChanged: if (!contextMenuOpen) releaseKeyboard()
+
   function applySavedSettings() {
+    titleText = getSetting("titleText", "")
+    glyphText = getSetting("glyphText", "")
+    titleHidden = getSetting("titleHidden", false)
+    glyphHidden = getSetting("glyphHidden", false)
     pollIntervalMs = getSetting("pollIntervalMs", 2000)
     showAgents = getSetting("showAgents", true)
     themeColors = getSetting("themeColors", true)
@@ -199,6 +233,10 @@ WidgetCard {
     ColumnLayout {
       Layout.fillWidth: true
       spacing: Style.space(4)
+
+      HeaderEditor {
+        host: monWidgetRoot
+      }
 
       Text {
         text: "REFRESH RATE"
@@ -404,14 +442,16 @@ WidgetCard {
       spacing: Style.space(8)
 
       Text {
-        text: ""
+        visible: !monWidgetRoot.glyphHidden
+        text: monWidgetRoot.shownGlyph
         font.family: Style.font.family
         font.pixelSize: 15
         color: Color.accent
       }
 
       Text {
-        text: "System Monitor"
+        visible: !monWidgetRoot.titleHidden
+        text: monWidgetRoot.shownTitle
         font.family: Style.font.family
         font.pixelSize: 13
         font.weight: Font.Bold

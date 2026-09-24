@@ -26,8 +26,8 @@ WidgetCard {
 
   width: 280
   height: 170
-  minWidth: 140
-  minHeight: 90
+  minWidth: 40
+  minHeight: 28
   maxWidth: Math.min(900, screenWidth - 40)
   maxHeight: Math.min(600, screenHeight - 80)
   resizable: true
@@ -104,13 +104,27 @@ WidgetCard {
   // Eye size = the widget's size (also the floating eyes' size), keeping
   // its shape. Saved like a resize-handle drag.
   function setEyeSize(w, aspect) {
-    w = Math.max(warden.minWidth, Math.min(warden.maxWidth, w))
+    // Clamp the width so the height stays in range too, keeping the shape.
+    var lo = Math.max(warden.minWidth, warden.minHeight / aspect)
+    var hi = Math.min(warden.maxWidth, warden.maxHeight / aspect)
+    w = Math.max(lo, Math.min(Math.max(lo, hi), w))
     warden.width = w
     warden.height = Math.max(warden.minHeight, Math.min(warden.maxHeight, w * aspect))
   }
+  // The size slider is logarithmic so the small end has room to aim.
+  function sizeFrac(w) {
+    return Math.max(0, Math.min(1, Math.log(w / warden.minWidth) / Math.log(warden.maxWidth / warden.minWidth)))
+  }
+  function sizeAt(f) {
+    return warden.minWidth * Math.pow(warden.maxWidth / warden.minWidth, f)
+  }
   function commitSize() {
     if (!rootRef || !rootRef.saveWidgetPos) return
-    var w = warden.snapVal(warden.width), h = warden.snapVal(warden.height)
+    // Snap the width only and keep the shape: snapping both squashes small
+    // buddies (46x28 would land on 40x20).
+    var aspect = warden.height / Math.max(1, warden.width)
+    warden.setEyeSize(Math.max(warden.minWidth, warden.snapVal(warden.width)), aspect)
+    var w = Math.round(warden.width), h = Math.round(warden.height)
     warden.width = w
     warden.height = h
     rootRef.saveWidgetPos(warden.widgetId, warden.targetItem.x, warden.targetItem.y, w, h, warden.monitorName)
@@ -125,6 +139,15 @@ WidgetCard {
     next[key] = !next[key]
     warden.openSections = next
     warden.saveSetting("openSections", next)
+  }
+  readonly property string behaviourSummary: {
+    var on = []
+    if (floating) on.push("Floating")
+    if (buddyMode) on.push("Buddy")
+    if (showCard) on.push("Card")
+    if (examineClicks) on.push("Clicks")
+    if (chaseFastMouse) on.push("Chase")
+    return on.length ? on.join(" · ") : "all off"
   }
   function nameOf(list, id) {
     for (var i = 0; i < list.length; i++) if (list[i].id === id) return list[i].name
@@ -1233,39 +1256,54 @@ WidgetCard {
         }
       }
 
-      MenuToggle {
-        glyph: "󰁌"
-        label: "Free-Floating Mode"
-        checked: warden.floating
-        onToggled: warden.toggleSetting("floating")
+      // Behaviour toggles fold like the other sections; anything added to
+      // this column folds with them.
+      SectionHeader {
+        label: "BEHAVIOUR"
+        value: warden.behaviourSummary
+        open: !!warden.openSections.behaviour
+        onToggled: warden.toggleSection("behaviour")
       }
 
-      MenuToggle {
-        glyph: "\uf004"
-        label: "Buddy Mode (always out)"
-        checked: warden.buddyMode
-        onToggled: warden.toggleSetting("buddyMode")
-      }
+      ColumnLayout {
+        visible: !!warden.openSections.behaviour
+        Layout.fillWidth: true
+        spacing: Style.space(4)
 
-      MenuToggle {
-        glyph: "󰆞"
-        label: "Card Background"
-        checked: warden.showCard
-        onToggled: warden.toggleSetting("showCard")
-      }
+        MenuToggle {
+          glyph: "󰁌"
+          label: "Free-Floating Mode"
+          checked: warden.floating
+          onToggled: warden.toggleSetting("floating")
+        }
 
-      MenuToggle {
-        glyph: "󰍽"
-        label: "Examine Clicks"
-        checked: warden.examineClicks
-        onToggled: warden.toggleSetting("examineClicks")
-      }
+        MenuToggle {
+          glyph: "\uf004"
+          label: "Buddy Mode (always out)"
+          checked: warden.buddyMode
+          onToggled: warden.toggleSetting("buddyMode")
+        }
 
-      MenuToggle {
-        glyph: "󰁔"
-        label: "Chase Fast Mouse"
-        checked: warden.chaseFastMouse
-        onToggled: warden.toggleSetting("chaseFastMouse")
+        MenuToggle {
+          glyph: "󰆞"
+          label: "Card Background"
+          checked: warden.showCard
+          onToggled: warden.toggleSetting("showCard")
+        }
+
+        MenuToggle {
+          glyph: "󰍽"
+          label: "Examine Clicks"
+          checked: warden.examineClicks
+          onToggled: warden.toggleSetting("examineClicks")
+        }
+
+        MenuToggle {
+          glyph: "󰁔"
+          label: "Chase Fast Mouse"
+          checked: warden.chaseFastMouse
+          onToggled: warden.toggleSetting("chaseFastMouse")
+        }
       }
 
       SectionHeader {
@@ -1333,7 +1371,7 @@ WidgetCard {
         }
       }
 
-      // Eye size: drags the widget's size (= the floating eyes' size),
+      // Buddy size: drags the widget's size (= the floating eyes' size),
       // keeping its shape; saved on release like a resize-handle drag.
       RowLayout {
         Layout.fillWidth: true
@@ -1343,7 +1381,7 @@ WidgetCard {
         spacing: Style.space(8)
 
         Text {
-          text: "Eye Size"
+          text: "Buddy Size"
           font.family: Style.font.family
           font.pixelSize: 10
           color: Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.7)
@@ -1353,7 +1391,7 @@ WidgetCard {
           id: sizeTrack
           Layout.fillWidth: true
           implicitHeight: 20
-          readonly property real frac: Math.max(0, Math.min(1, (warden.width - warden.minWidth) / Math.max(1, warden.maxWidth - warden.minWidth)))
+          readonly property real frac: warden.sizeFrac(warden.width)
 
           Rectangle {
             anchors.verticalCenter: parent.verticalCenter
@@ -1387,7 +1425,7 @@ WidgetCard {
             property real aspect: 1
             function apply(mx) {
               var f = Math.max(0, Math.min(1, mx / width))
-              warden.setEyeSize(warden.minWidth + f * (warden.maxWidth - warden.minWidth), aspect)
+              warden.setEyeSize(warden.sizeAt(f), aspect)
             }
             onPressed: function(mouse) {
               aspect = warden.height / Math.max(1, warden.width)
