@@ -74,6 +74,7 @@ Item {
   // The character buddies' own colours, nudged a little toward the theme.
   function skinOf(base, amount) { return Qt.tint(base, Qt.alpha(col("glow", "#2a9d8f"), amount || 0.18)) }
   readonly property bool hasLids: kind === "squid" || kind === "unicorn"
+  readonly property bool hasFront: hasLids || kind === "robot"
 
   Canvas {
     id: body
@@ -402,11 +403,9 @@ Item {
         ctx.fillStyle = metalDark
         var rv = [[-0.36, -0.41], [0.36, -0.41], [-0.36, 0.03], [0.36, 0.03]]
         for (var ri = 0; ri < rv.length; ri++) { ctx.beginPath(); ctx.arc(rv[ri][0], rv[ri][1], 0.018, 0, Math.PI * 2); ctx.fill() }
-        // Visor: a dark screen with faint scanlines and a glassy glint.
+        // Visor: a dark screen (its scanlines and glass go on the front
+        // canvas, over the eyes, so the eyes read as on the display).
         ctx.beginPath(); ctx.roundedRect(-0.33, -0.37, 0.66, 0.36, 0.1, 0.1); fill(lash); ink(0.016)
-        ctx.strokeStyle = rgba(light, 0.1); ctx.lineWidth = 0.008
-        for (var sl2 = -0.34; sl2 < -0.03; sl2 += 0.03) { ctx.beginPath(); ctx.moveTo(-0.3, sl2); ctx.lineTo(0.3, sl2); ctx.stroke() }
-        ctx.beginPath(); ctx.moveTo(-0.26, -0.33); ctx.lineTo(-0.16, -0.33); ctx.lineTo(-0.26, -0.2); ctx.closePath(); fill(rgba(hl, 0.25))
         // Speaker-grille mouth.
         for (var gm = -2; gm <= 2; gm++) { ctx.beginPath(); ctx.moveTo(gm * 0.035, 0.015); ctx.lineTo(gm * 0.035, 0.055); ink(0.014) }
       } else if (creature.kind === "squid") {
@@ -566,15 +565,16 @@ Item {
   }
 
   // In front of the eyes: the character buddies' heavy half-lids (they drop
-  // shut with a blink), brows and the squid-man's nose.
+  // shut with a blink), brows and the squid-man's nose; the robot's screen
+  // glass (scanlines, refresh band, glint) over its eyes.
   Canvas {
     id: front
     anchors.fill: parent
-    visible: creature.hasLids
+    visible: creature.hasFront
 
     Connections {
       target: creature
-      enabled: creature.hasLids
+      enabled: creature.hasFront
       function onTChanged() { front.requestPaint() }
       function onThemeChanged() { front.requestPaint() }
       function onKindChanged() { front.requestPaint() }
@@ -587,8 +587,39 @@ Item {
       var ctx = getContext("2d")
       ctx.reset()
       ctx.clearRect(0, 0, width, height)
-      if (!creature.hasLids) return
+      if (!creature.hasFront) return
       var S = creature.unitPx
+      if (creature.kind === "robot") {
+        var dark = creature.col("lash", "#1c1f3f")
+        var glassLight = creature.col("irisLight", "#ffb3a7")
+        var glint = creature.col("highlight", "#fff7ea")
+        ctx.save()
+        ctx.translate(creature.cx, creature.cy)
+        ctx.scale(S, S)
+        ctx.beginPath(); ctx.roundedRect(-0.33, -0.37, 0.66, 0.36, 0.1, 0.1)
+        ctx.clip()
+        // Faint screen tint.
+        ctx.fillStyle = creature.rgba(glassLight, 0.06)
+        ctx.fillRect(-0.34, -0.38, 0.68, 0.38)
+        // Rolling refresh band, drifting down the screen.
+        var band = -0.42 + ((creature.t * 0.12) % 1) * 0.5
+        ctx.fillStyle = creature.rgba(glassLight, 0.1)
+        ctx.fillRect(-0.34, band, 0.68, 0.05)
+        // Scanlines: dark gaps between the lit rows cut through the eyes.
+        ctx.fillStyle = creature.rgba(dark, 0.38)
+        for (var sl = -0.37; sl < 0; sl += 0.022) ctx.fillRect(-0.34, sl + 0.011, 0.68, 0.008)
+        // Dark edge vignette, like the glass curving away.
+        ctx.strokeStyle = creature.rgba(dark, 0.55)
+        ctx.lineWidth = 0.05
+        ctx.beginPath(); ctx.roundedRect(-0.33, -0.37, 0.66, 0.36, 0.1, 0.1); ctx.stroke()
+        // Glassy glint.
+        ctx.fillStyle = creature.rgba(glint, 0.22)
+        ctx.beginPath(); ctx.moveTo(-0.27, -0.34); ctx.lineTo(-0.15, -0.34); ctx.lineTo(-0.27, -0.19); ctx.closePath(); ctx.fill()
+        ctx.fillStyle = creature.rgba(glint, 0.12)
+        ctx.beginPath(); ctx.moveTo(-0.12, -0.34); ctx.lineTo(-0.08, -0.34); ctx.lineTo(-0.2, -0.19); ctx.lineTo(-0.24, -0.19); ctx.closePath(); ctx.fill()
+        ctx.restore()
+        return
+      }
       var lash = creature.col("lash", "#1c1f3f")
       var squid = creature.kind === "squid"
       var skin = squid ? creature.skinOf("#a3d4bf") : creature.skinOf("#f6efdd", 0.05)
