@@ -4,6 +4,9 @@ import QtQuick
 // 👁️ Abyss Eye -- one anime-style eye drawn on a Canvas. Pure view: the
 // Abyss Warden widget drives gaze/openness/pupil; this only paints them.
 // Repaints only when a driven value changes, so a still eye costs nothing.
+// Look: flat cel shading in the risograph-print anime style -- solid fills,
+// hard-edged shadows fading through halftone dots, coloured ink lines,
+// paper grain, and an offset second "ink pass" in place of a glow.
 //
 // Drawn in "eye units": the almond is 1 unit wide, centred on the origin,
 // y down, inner corner on the left / outer corner (wing) on the right. The
@@ -21,7 +24,7 @@ Canvas {
   property real openness: 1
   // Pupil dilation multiplier (~0.7 constricted .. ~1.35 dilated).
   property real pupilScale: 1
-  // Glow strength 0..1 (0 while asleep).
+  // Print-offset strength 0..1 (0 while asleep).
   property real glow: 1
   // { sclera, scleraShade, irisDark, iris, irisLight, pupil, highlight, lash, glow, slit }
   property var theme: ({})
@@ -143,81 +146,139 @@ Canvas {
       ctx.closePath()
     }
 
-    var lash = col("lash", "#140a1c")
-    var glowCol = col("glow", "#9d4edd")
+    var lash = col("lash", "#1c1f3f")
+    var printCol = col("glow", "#2a9d8f")
+    var shadeCol = col("scleraShade", "#9fc9bf")
 
-    // --- Glow + sclera
-    ctx.save()
-    if (glow > 0.01 && o > 0.05) {
-      ctx.shadowColor = rgba(glowCol, 0.85 * glow)
-      ctx.shadowBlur = s * 0.12 * glow
+    // Seeded so grain and halftone don't crawl between repaints.
+    var seed = mirrored ? 7331 : 1337
+    function rand() {
+      seed = (seed * 16807) % 2147483647
+      return (seed - 1) / 2147483646
     }
-    almond()
-    var sg = ctx.createRadialGradient(0, 0, 0.05, 0, 0, 0.55)
-    sg.addColorStop(0, col("sclera", "#f4f1fa"))
-    sg.addColorStop(1, col("scleraShade", "#c9c0dc"))
-    ctx.fillStyle = sg
-    ctx.fill()
-    ctx.restore()
+    // Many dots, one path, one fill.
+    function dots(list, color) {
+      if (list.length === 0) return
+      ctx.fillStyle = color
+      ctx.beginPath()
+      for (var d = 0; d < list.length; d++) {
+        ctx.moveTo(list[d][0] + list[d][2], list[d][1])
+        ctx.arc(list[d][0], list[d][1], list[d][2], 0, Math.PI * 2)
+      }
+      ctx.fill()
+    }
 
-    // --- Everything inside the lids
+    // --- Riso misregistration: a flat, offset second "ink pass" of the
+    // eye shape in the theme's print colour (stands in for a glow).
+    if (glow > 0.01 && o > 0.05) {
+      ctx.save()
+      ctx.translate(0.03, 0.035)
+      almond()
+      ctx.fillStyle = rgba(printCol, 0.9 * glow)
+      ctx.fill()
+      ctx.restore()
+    }
+
+    // --- Everything inside the lids: flat paper white + cel shading
     ctx.save()
     almond()
+    ctx.fillStyle = col("sclera", "#f2e6d0")
+    ctx.fill()
     ctx.clip()
+
+    // Shadow cast by the upper lid: one hard-edged flat shape...
+    var sd = 0.07 + 0.05 * o
+    function lidEdge(t) {
+      var p = pointAt(up, t)
+      return [p[0], p[1] + sd * Math.sin(Math.PI * (0.12 + 0.76 * t))]
+    }
+    ctx.fillStyle = shadeCol
+    ctx.beginPath()
+    ctx.moveTo(-0.7, -1.2)
+    ctx.lineTo(0.7, -1.2)
+    for (var si = 24; si >= 0; si--) {
+      var e = lidEdge(si / 24)
+      ctx.lineTo(e[0], e[1])
+    }
+    ctx.closePath()
+    ctx.fill()
+
+    // ...fading out through a halftone band.
+    var tone = []
+    for (var row = 0; row < 4; row++) {
+      for (var hx = 0; hx <= 34; hx++) {
+        var t = (hx + (row % 2) * 0.5) / 34
+        var he = lidEdge(t)
+        tone.push([he[0], he[1] + 0.018 + row * 0.024, 0.0115 * (1 - row / 4.2)])
+      }
+    }
+    dots(tone, shadeCol)
+
+    // Paper grain.
+    var grain = []
+    for (var g = 0; g < 110; g++) grain.push([rand() - 0.5, rand() * 0.9 - 0.5, 0.003 + rand() * 0.004])
+    dots(grain, rgba(lash, 0.12))
 
     var R = st.iris, ry = st.irisRy
     var gx = Math.max(-1, Math.min(1, gazeX)) * (mirrored ? -1 : 1)
     var ix = gx * Math.max(0.12, 0.5 - R - 0.02)
     var iy = st.irisY + Math.max(-1, Math.min(1, gazeY)) * 0.12
 
-    // Iris (drawn in a vertically stretched frame for oval irises).
+    // --- Iris (drawn in a vertically stretched frame for oval irises)
     ctx.save()
     ctx.translate(ix, iy)
     ctx.scale(1, ry)
 
-    var ig = ctx.createRadialGradient(0, R * 0.18, R * 0.1, 0, 0, R)
-    ig.addColorStop(0, col("irisLight", "#e0aaff"))
-    ig.addColorStop(0.45, col("iris", "#7b2ff7"))
-    ig.addColorStop(0.88, col("irisDark", "#2a0b4d"))
-    ig.addColorStop(1, lash)
-    ctx.fillStyle = ig
     ctx.beginPath()
     ctx.arc(0, 0, R, 0, Math.PI * 2)
+    ctx.fillStyle = col("iris", "#e8456b")
     ctx.fill()
 
-    // Fine radial striations.
-    ctx.strokeStyle = rgba(col("irisLight", "#e0aaff"), 0.22)
-    ctx.lineWidth = R * 0.018
-    for (var k = 0; k < 40; k++) {
-      var a = k / 40 * Math.PI * 2
-      var r0 = R * (0.42 + (k % 3) * 0.04), r1 = R * (0.8 + (k % 2) * 0.08)
+    // Shading shapes are built to stay inside the iris circle rather than
+    // clipped to it: Canvas clip() replaces the current clip instead of
+    // intersecting, and restoring a nested clip drops the eye-shape clip.
+    var irisDark = col("irisDark", "#8c1f3f")
+    // Flat shadow cap: the top of the circle down to a sagging edge.
+    var capY = -R * 0.1, capA = Math.asin(-capY / R)
+    ctx.fillStyle = irisDark
+    ctx.beginPath()
+    ctx.arc(0, 0, R, Math.PI + capA, 2 * Math.PI - capA, false)
+    ctx.quadraticCurveTo(0, capY + R * 0.28, -Math.cos(capA) * R, capY)
+    ctx.closePath()
+    ctx.fill()
+    // Halftone under the cap's edge.
+    var itone = []
+    for (var ir = 0; ir < 3; ir++) {
+      for (var ixg = -6; ixg <= 6; ixg++) {
+        var tx = (ixg + (ir % 2) * 0.5) * R * 0.16, ty = capY + R * 0.14 + ir * R * 0.14
+        if (tx * tx + ty * ty < R * R * 0.8) itone.push([tx, ty, R * 0.045 * (1 - ir / 3.2)])
+      }
+    }
+    dots(itone, irisDark)
+    // Light crescent: the bottom of the circle up to a bulging edge.
+    var creY = R * 0.4, creA = Math.asin(creY / R)
+    ctx.fillStyle = col("irisLight", "#ffb3a7")
+    ctx.beginPath()
+    ctx.arc(0, 0, R, creA, Math.PI - creA, false)
+    ctx.quadraticCurveTo(0, creY - R * 0.3, Math.cos(creA) * R, creY)
+    ctx.closePath()
+    ctx.fill()
+    // A few inked flecks radiating in the lower half.
+    ctx.strokeStyle = irisDark
+    ctx.lineWidth = R * 0.035
+    ctx.lineCap = "round"
+    for (var f = 0; f < 7; f++) {
+      var fa = Math.PI * (0.18 + f * 0.105)
       ctx.beginPath()
-      ctx.moveTo(Math.cos(a) * r0, Math.sin(a) * r0)
-      ctx.lineTo(Math.cos(a) * r1, Math.sin(a) * r1)
+      ctx.moveTo(Math.cos(fa) * R * 0.55, Math.sin(fa) * R * 0.55)
+      ctx.lineTo(Math.cos(fa) * R * 0.82, Math.sin(fa) * R * 0.82)
       ctx.stroke()
     }
 
-    // Anime shading: dark upper half, glowing lower crescent.
-    var shade = ctx.createLinearGradient(0, -R, 0, R * 0.2)
-    shade.addColorStop(0, rgba(col("irisDark", "#2a0b4d"), 0.85))
-    shade.addColorStop(1, rgba(col("irisDark", "#2a0b4d"), 0))
-    ctx.fillStyle = shade
-    ctx.beginPath()
-    ctx.arc(0, 0, R, 0, Math.PI * 2)
-    ctx.fill()
-
-    var cres = ctx.createRadialGradient(0, R * 0.75, R * 0.05, 0, R * 0.75, R * 0.75)
-    cres.addColorStop(0, rgba(col("irisLight", "#e0aaff"), 0.75))
-    cres.addColorStop(1, rgba(col("irisLight", "#e0aaff"), 0))
-    ctx.fillStyle = cres
-    ctx.beginPath()
-    ctx.arc(0, 0, R * 0.97, 0, Math.PI * 2)
-    ctx.fill()
-
     // Hypnotic rings.
     if (st.rings) {
-      ctx.strokeStyle = rgba(lash, 0.55)
-      ctx.lineWidth = R * 0.035
+      ctx.strokeStyle = lash
+      ctx.lineWidth = R * 0.04
       for (var ri = 1; ri <= st.rings; ri++) {
         ctx.beginPath()
         ctx.arc(0, 0, R * (0.3 + 0.6 * ri / (st.rings + 1)), 0, Math.PI * 2)
@@ -225,16 +286,16 @@ Canvas {
       }
     }
 
-    // Limbal ring.
+    // Inked inner ring (the pink eyes in the reference art have one).
     ctx.strokeStyle = rgba(lash, 0.85)
-    ctx.lineWidth = R * 0.07
+    ctx.lineWidth = R * 0.045
     ctx.beginPath()
-    ctx.arc(0, 0, R * 0.965, 0, Math.PI * 2)
+    ctx.arc(0, 0, R * 0.64, 0, Math.PI * 2)
     ctx.stroke()
 
     // Pupil: theme slit wins, else the style's shape.
     var ps = Math.max(0.5, Math.min(1.5, pupilScale))
-    ctx.fillStyle = col("pupil", "#07020d")
+    ctx.fillStyle = col("pupil", "#1c1f3f")
     ctx.beginPath()
     if (col("slit", false)) {
       var pw = R * 0.2 * ps, ph = R * 1.5
@@ -246,31 +307,38 @@ Canvas {
       ctx.arc(0, 0, R * st.pupilR * ps, 0, Math.PI * 2)
     }
     ctx.fill()
+
+    // Iris outline.
+    ctx.strokeStyle = lash
+    ctx.lineWidth = R * 0.085
+    ctx.beginPath()
+    ctx.arc(0, 0, R * 0.97, 0, Math.PI * 2)
+    ctx.stroke()
     ctx.restore()
 
-    // Highlights ride along with the iris.
-    var hl = col("highlight", "#ffffff")
+    // Highlights: flat, hard-edged, riding along with the iris.
+    var hl = col("highlight", "#fff7ea")
     var Rv = R * ry
-    function oval(x, y, w, h, a) {
-      ctx.fillStyle = rgba(hl, a)
+    function oval(x, y, w, h) {
+      ctx.fillStyle = hl
       ctx.beginPath()
       ctx.ellipse(x - w / 2, y - h / 2, w, h)
       ctx.fill()
     }
-    function dot(x, y, r, a) {
-      ctx.fillStyle = rgba(hl, a)
+    function dot(x, y, r) {
+      ctx.fillStyle = hl
       ctx.beginPath()
       ctx.arc(x, y, r, 0, Math.PI * 2)
       ctx.fill()
     }
     if (st.highlight === "big") {
-      oval(ix - hs * R * 0.35, iy - Rv * 0.4, R * 0.7, Rv * 0.55, 0.95)
-      oval(ix + hs * R * 0.38, iy + Rv * 0.42, R * 0.34, Rv * 0.26, 0.85)
-      dot(ix + hs * R * 0.05, iy + Rv * 0.12, R * 0.07, 0.8)
+      oval(ix - hs * R * 0.35, iy - Rv * 0.4, R * 0.7, Rv * 0.55)
+      oval(ix + hs * R * 0.38, iy + Rv * 0.42, R * 0.34, Rv * 0.26)
+      dot(ix + hs * R * 0.05, iy + Rv * 0.12, R * 0.07)
     } else if (st.highlight === "star") {
       // Four-point sparkle over the pupil + a small dot.
       var sx = ix - hs * R * 0.12, sy = iy - Rv * 0.15, sr = R * 0.42, sn = sr * 0.18
-      ctx.fillStyle = rgba(hl, 0.97)
+      ctx.fillStyle = hl
       ctx.beginPath()
       ctx.moveTo(sx, sy - sr)
       ctx.quadraticCurveTo(sx + sn, sy - sn, sx + sr * 0.75, sy)
@@ -278,30 +346,30 @@ Canvas {
       ctx.quadraticCurveTo(sx - sn, sy + sn, sx - sr * 0.75, sy)
       ctx.quadraticCurveTo(sx - sn, sy - sn, sx, sy - sr)
       ctx.fill()
-      dot(ix + hs * R * 0.4, iy + Rv * 0.45, R * 0.09, 0.85)
+      dot(ix + hs * R * 0.4, iy + Rv * 0.45, R * 0.09)
     } else if (st.highlight === "soft") {
-      oval(ix - hs * R * 0.4, iy - Rv * 0.35, R * 0.4, Rv * 0.3, 0.85)
+      oval(ix - hs * R * 0.4, iy - Rv * 0.35, R * 0.4, Rv * 0.3)
     } else {
-      oval(ix - hs * R * 0.37, iy - Rv * 0.42, R * 0.5, Rv * 0.36, 0.95)
-      dot(ix + hs * R * 0.36, iy + Rv * 0.34, R * 0.1, 0.85)
+      oval(ix - hs * R * 0.37, iy - Rv * 0.42, R * 0.5, Rv * 0.36)
+      dot(ix + hs * R * 0.36, iy + Rv * 0.34, R * 0.1)
     }
-
-    // Upper-lid shadow falling across the eye.
-    var shadeTop = Math.min(Ly, Ry, upY * 0.75)
-    var lidShade = ctx.createLinearGradient(0, shadeTop + 0.03, 0, shadeTop + 0.2)
-    lidShade.addColorStop(0, rgba(lash, 0.5))
-    lidShade.addColorStop(1, rgba(lash, 0))
-    ctx.fillStyle = lidShade
-    ctx.fillRect(-0.6, shadeTop - 0.1, 1.2, 0.8)
     ctx.restore()
 
-    // --- Lid line, wing, lashes
+    // --- Ink: lid line (brush-thick toward the outer corner), wing, lashes
     ctx.lineCap = "round"
     ctx.lineJoin = "round"
     ctx.strokeStyle = lash
-    ctx.lineWidth = lerp(st.lashW * 0.6, st.lashW, o)
+    ctx.lineWidth = lerp(st.lashW * 0.5, st.lashW * 0.8, o)
     ctx.beginPath()
     trace(up, true)
+    ctx.stroke()
+    ctx.lineWidth = lerp(st.lashW * 0.7, st.lashW * 1.3, o)
+    ctx.beginPath()
+    for (var bi = 0; bi <= 16; bi++) {
+      var bpt = pointAt(up, 0.38 + 0.62 * bi / 16)
+      if (bi === 0) ctx.moveTo(bpt[0], bpt[1])
+      else ctx.lineTo(bpt[0], bpt[1])
+    }
     ctx.stroke()
 
     if (st.wing > 0) {
@@ -315,20 +383,25 @@ Canvas {
       ctx.fill()
     }
 
-    ctx.lineWidth = Math.max(0.012, st.lashW * 0.4)
+    // Lashes as pointed brush flicks.
+    ctx.fillStyle = lash
+    var lb = Math.max(0.01, st.lashW * 0.32)
     for (var li = 0; li < st.lashes.length; li++) {
       var bp = pointAt(up, st.lashes[li][0])
       var len = st.lashes[li][1]
+      var tipX = bp[0] + len * 0.65, tipY = bp[1] - len * (0.35 + 0.65 * o)
       ctx.beginPath()
-      ctx.moveTo(bp[0], bp[1])
-      ctx.quadraticCurveTo(bp[0] + len * 0.3, bp[1] - len * 0.6 * o, bp[0] + len * 0.65, bp[1] - len * (0.35 + 0.65 * o))
-      ctx.stroke()
+      ctx.moveTo(bp[0] - lb, bp[1] + lb * 0.4)
+      ctx.quadraticCurveTo(bp[0] + len * 0.2, bp[1] - len * 0.55 * o, tipX, tipY)
+      ctx.quadraticCurveTo(bp[0] + len * 0.4, bp[1] - len * 0.45 * o, bp[0] + lb, bp[1] + lb * 0.4)
+      ctx.closePath()
+      ctx.fill()
     }
 
     // Double-lid crease.
     if (st.crease) {
-      ctx.strokeStyle = rgba(lash, 0.6 * Math.max(0.3, o))
-      ctx.lineWidth = 0.014
+      ctx.strokeStyle = rgba(lash, 0.8 * Math.max(0.3, o))
+      ctx.lineWidth = 0.016
       ctx.beginPath()
       for (var ci = 0; ci <= 20; ci++) {
         var ct = 0.12 + ci * 0.041
@@ -340,18 +413,18 @@ Canvas {
       ctx.stroke()
     }
 
-    // Lower lid: traced, fading toward the inner corner, + lower lashes.
+    // Lower lid: inked along the outer two thirds only, + lower lashes.
     if (o > 0.08) {
-      var lg = ctx.createLinearGradient(Rx, 0, Lx, 0)
-      lg.addColorStop(0, rgba(lash, 0.75))
-      lg.addColorStop(1, rgba(lash, 0.1))
-      ctx.strokeStyle = lg
-      ctx.lineWidth = Math.max(0.01, st.lashW * 0.28)
+      ctx.strokeStyle = lash
+      ctx.lineWidth = Math.max(0.01, st.lashW * 0.3)
       ctx.beginPath()
-      trace(lo, true)
+      for (var lt = 0; lt <= 14; lt++) {
+        var lpt = pointAt(lo, 0.68 * lt / 14)
+        if (lt === 0) ctx.moveTo(lpt[0], lpt[1])
+        else ctx.lineTo(lpt[0], lpt[1])
+      }
       ctx.stroke()
 
-      ctx.strokeStyle = rgba(lash, 0.7)
       ctx.lineWidth = 0.015
       for (var lw = 0; lw < st.lower; lw++) {
         var lp = pointAt(lo, 0.18 + lw * 0.13)

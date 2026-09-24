@@ -93,28 +93,37 @@ WidgetCard {
     active: true
   }
 
+  // Flat riso-print palettes: sclera = paper, scleraShade = the cel shadow
+  // tone, lash = coloured ink (never pure black), glow = the offset print
+  // colour (usually a contrasting ink).
   readonly property var systemTheme: ({
     id: "system", name: "System Theme",
-    sclera: String(Qt.tint("#f4f2f8", Qt.alpha(pal.secondary, 0.04))),
-    scleraShade: String(Qt.tint("#c6c0d4", Qt.alpha(pal.secondary, 0.16))),
-    irisDark: String(Qt.darker(Color.accent, 3.0)),
+    sclera: String(Qt.tint("#f3ead9", Qt.alpha(pal.secondary, 0.05))),
+    scleraShade: String(Qt.tint("#aebccb", Qt.alpha(pal.tertiary, 0.35))),
+    irisDark: String(Qt.darker(Color.accent, 2.4)),
     iris: String(Color.accent),
-    irisLight: String(pal.mixColor(Qt.lighter(Color.accent, 1.6), pal.highlight, 0.25)),
-    pupil: "#07040c",
-    highlight: "#ffffff",
-    lash: String(Qt.tint("#0d0911", Qt.alpha(pal.secondary, 0.22))),
-    glow: String(Color.accent),
+    irisLight: String(pal.mixColor(Qt.lighter(Color.accent, 1.5), pal.highlight, 0.3)),
+    pupil: String(Qt.tint("#16152b", Qt.alpha(pal.secondary, 0.2))),
+    highlight: "#fff7ea",
+    lash: String(Qt.tint("#16152b", Qt.alpha(pal.secondary, 0.25))),
+    glow: String(pal.tertiary),
     slit: false
   })
 
   readonly property var presetThemes: [
-    { id: "abyss", name: "Abyssal Violet", sclera: "#f4f1fa", scleraShade: "#c9c0dc", irisDark: "#2a0b4d", iris: "#7b2ff7", irisLight: "#e0aaff", pupil: "#07020d", highlight: "#ffffff", lash: "#140a1c", glow: "#9d4edd", slit: false },
-    { id: "crimson", name: "Blood Moon", sclera: "#f3e6e6", scleraShade: "#d6b3b3", irisDark: "#3a0000", iris: "#c1121f", irisLight: "#ff8f8f", pupil: "#0a0000", highlight: "#fff4f4", lash: "#1a0505", glow: "#ff2a2a", slit: false },
-    { id: "serpent", name: "Jade Serpent", sclera: "#f1ecc8", scleraShade: "#cfc48a", irisDark: "#0b3d20", iris: "#2dc653", irisLight: "#c7f9cc", pupil: "#021007", highlight: "#fbfff5", lash: "#0d1a10", glow: "#38b000", slit: true },
-    { id: "dragon", name: "Gilded Dragon", sclera: "#f6ecd0", scleraShade: "#d9c089", irisDark: "#5a2d00", iris: "#f4a261", irisLight: "#ffe8a3", pupil: "#140800", highlight: "#fffaf0", lash: "#1f1204", glow: "#ffb703", slit: true },
-    { id: "frost", name: "Frostbound", sclera: "#eef6fb", scleraShade: "#b8cfdd", irisDark: "#0b3954", iris: "#4cc9f0", irisLight: "#e0fbfc", pupil: "#020c14", highlight: "#ffffff", lash: "#0a1620", glow: "#90e0ef", slit: false },
-    { id: "sakura", name: "Sakura Dream", sclera: "#fdf3f7", scleraShade: "#e8c3d3", irisDark: "#6d1b4d", iris: "#ff70a6", irisLight: "#ffd6e8", pupil: "#1a0510", highlight: "#ffffff", lash: "#2a0c1b", glow: "#ff99c8", slit: false },
-    { id: "void", name: "Hollow Void", sclera: "#0c0c12", scleraShade: "#000000", irisDark: "#3d3d4a", iris: "#c9c9d6", irisLight: "#ffffff", pupil: "#000000", highlight: "#ffffff", lash: "#000000", glow: "#c8c8ff", slit: false }
+    // From the reference art: teal room / hot-pink desk / navy ink.
+    { id: "riso", name: "Riso Room", sclera: "#f2e6d0", scleraShade: "#8fc5b8", irisDark: "#8c1f3f", iris: "#e8456b", irisLight: "#ffb3a7", pupil: "#1c1f3f", highlight: "#fff7ea", lash: "#1c1f3f", glow: "#2a9d8f", slit: false },
+    // Magenta canopy over a teal sky.
+    { id: "petal", name: "Petal Dusk", sclera: "#efe3e6", scleraShade: "#c79bb5", irisDark: "#7a1f4b", iris: "#ff5f8f", irisLight: "#ffc2d1", pupil: "#2b1433", highlight: "#fffafc", lash: "#2b1433", glow: "#1f8a78", slit: false },
+    // Teal sky, orange field, red pinwheel.
+    { id: "pinwheel", name: "Pinwheel Summer", sclera: "#f4ead8", scleraShade: "#8fb8b8", irisDark: "#7d1d3f", iris: "#e84a5f", irisLight: "#ffb38a", pupil: "#23204a", highlight: "#fffaf0", lash: "#23204a", glow: "#f29e4c", slit: false },
+    { id: "abyss", name: "Abyssal Violet", sclera: "#efe8f3", scleraShade: "#b7a8d6", irisDark: "#2a0b4d", iris: "#7b2ff7", irisLight: "#e0aaff", pupil: "#150826", highlight: "#ffffff", lash: "#241046", glow: "#ff6fa3", slit: false },
+    { id: "crimson", name: "Blood Moon", sclera: "#f3e6e0", scleraShade: "#d9a3a3", irisDark: "#4a0610", iris: "#c1121f", irisLight: "#ff8f8f", pupil: "#1a0508", highlight: "#fff4f0", lash: "#2a0d1a", glow: "#2a9d8f", slit: false },
+    { id: "serpent", name: "Jade Serpent", sclera: "#f1ecc8", scleraShade: "#c9bf7e", irisDark: "#0b3d20", iris: "#2dc653", irisLight: "#c7f9cc", pupil: "#08170d", highlight: "#fbfff5", lash: "#10281a", glow: "#f2c14e", slit: true },
+    { id: "dragon", name: "Gilded Dragon", sclera: "#f6ecd0", scleraShade: "#e0b870", irisDark: "#6a3300", iris: "#f4a261", irisLight: "#ffe8a3", pupil: "#1f0f03", highlight: "#fffaf0", lash: "#2d1606", glow: "#e84a5f", slit: true },
+    { id: "frost", name: "Frostbound", sclera: "#eef4f6", scleraShade: "#9fc3d6", irisDark: "#0b3954", iris: "#4cc9f0", irisLight: "#e0fbfc", pupil: "#0a1a2a", highlight: "#ffffff", lash: "#0f2438", glow: "#ff8fab", slit: false },
+    { id: "sakura", name: "Sakura Dream", sclera: "#fbf0f3", scleraShade: "#e5a9c4", irisDark: "#6d1b4d", iris: "#ff70a6", irisLight: "#ffd6e8", pupil: "#2a0c1b", highlight: "#ffffff", lash: "#3a1230", glow: "#2ec4b6", slit: false },
+    { id: "void", name: "Hollow Void", sclera: "#16161d", scleraShade: "#2c2c38", irisDark: "#4a4a58", iris: "#c9c9d6", irisLight: "#ffffff", pupil: "#000000", highlight: "#ffffff", lash: "#000000", glow: "#c8c8ff", slit: false }
   ]
 
   readonly property var allThemes: [systemTheme].concat(presetThemes)

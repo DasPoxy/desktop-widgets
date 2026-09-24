@@ -191,7 +191,7 @@ QtObject {
       icon: "󰈈",
       badge: "Watcher",
       badges: ["Watcher", "Custom"],
-      description: "An anime eye that only appears while your screen is being recorded (Omarchy recorder, OBS, screen shares). It follows the mouse, glances at windows that change, and blinks. One eye or a pair, 9 eye styles, can float freely around the screen; 7 eye themes or your system theme.",
+      description: "An anime eye that only appears while your screen is being recorded (Omarchy recorder, OBS, screen shares). It follows the mouse, glances at windows that change, and blinks. One eye or a pair, 9 eye styles, can float freely around the screen; 10 eye themes or your system theme.",
       componentUrl: Qt.resolvedUrl("AbyssWardenWidget.qml")
     },
     {
