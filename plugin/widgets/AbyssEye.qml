@@ -30,6 +30,8 @@ Canvas {
   property var theme: ({})
   property string styleId: "classic"
   property bool mirrored: false
+  // "auto" = the eye style's own iris; otherwise a key of irisStyles.
+  property string irisStyle: "auto"
 
   onGazeXChanged: requestPaint()
   onGazeYChanged: requestPaint()
@@ -38,6 +40,7 @@ Canvas {
   onGlowChanged: requestPaint()
   onThemeChanged: requestPaint()
   onStyleIdChanged: requestPaint()
+  onIrisStyleChanged: requestPaint()
   onMirroredChanged: requestPaint()
   onWidthChanged: requestPaint()
   onHeightChanged: requestPaint()
@@ -85,6 +88,25 @@ Canvas {
     angular: { inner: 0.05, outer: -0.05, upY: -0.4, up1: -0.3, up2: 0.26, loY: 0.3, lo1: 0.3, lo2: -0.3, closedY: 0.14, angular: true,
       iris: 0.22, irisRy: 1.15, irisY: 0.02, pupil: "round", pupilR: 0.45, highlight: "classic",
       lashW: 0.07, wing: 0.07, lashes: [], lower: 0, brow: "flat", browY: -0.5, top: -0.58, bot: 0.34 }
+  })
+
+  // Iris styles: pattern (cel | rings | petal | spiral | hollow | crosshair |
+  // pinpoint), pupil (round | tall | slit | heart | none) with pupilR as a
+  // fraction of the iris radius, and highlight (classic | big | star | soft
+  // | tiny | none). Everything scales with the iris, whose size the eye
+  // style sets.
+  readonly property var irisStyles: ({
+    cel: { pattern: "cel", pupil: "round", pupilR: 0.4, highlight: "classic" },
+    sparkle: { pattern: "cel", pupil: "tall", pupilR: 0.46, highlight: "big" },
+    star: { pattern: "cel", pupil: "tall", pupilR: 0.55, highlight: "star" },
+    rings: { pattern: "rings", pupil: "round", pupilR: 0.28, highlight: "classic", rings: 3 },
+    blossom: { pattern: "petal", pupil: "round", pupilR: 0.3, highlight: "classic" },
+    spiral: { pattern: "spiral", pupil: "round", pupilR: 0.14, highlight: "soft" },
+    hollow: { pattern: "hollow", pupil: "none", pupilR: 0, highlight: "tiny" },
+    crosshair: { pattern: "crosshair", pupil: "round", pupilR: 0.16, highlight: "soft" },
+    heart: { pattern: "cel", pupil: "heart", pupilR: 0.5, highlight: "classic" },
+    pinpoint: { pattern: "pinpoint", pupil: "round", pupilR: 0.17, highlight: "soft" },
+    slit: { pattern: "cel", pupil: "slit", pupilR: 0.2, highlight: "classic" }
   })
 
   function col(key, fallback) {
@@ -219,7 +241,23 @@ Canvas {
     for (var g = 0; g < 110; g++) grain.push([rand() - 0.5, rand() * 0.9 - 0.5, 0.003 + rand() * 0.004])
     dots(grain, rgba(lash, 0.12))
 
+    // Size and resting spot come from the eye style (so any iris fits any
+    // eye); the pattern, pupil and highlights come from the iris style, or
+    // from the eye style's own defaults when set to "auto".
     var R = st.iris, ry = st.irisRy
+    var irs = irisStyles[irisStyle]
+    var autoIris = !irs
+    // A chosen iris grows to what this eye's opening can hold (never below
+    // the eye style's own size), so a detailed pattern still reads in a
+    // small-iris style like Shocked. The auto iris keeps the style's size.
+    if (!autoIris) {
+      var opening = (st.loY - st.upY) * 0.75
+      R = Math.max(R, Math.min(0.26, 0.42 * opening / ry))
+    }
+    if (autoIris) irs = { pattern: st.rings ? "rings" : "cel", pupil: st.pupil, pupilR: st.pupilR, highlight: st.highlight, rings: st.rings }
+    // Themes with slit pupils (serpent, dragon) keep them on the auto iris.
+    var pupilShape = (autoIris && col("slit", false)) ? "slit" : irs.pupil
+
     var gx = Math.max(-1, Math.min(1, gazeX)) * (mirrored ? -1 : 1)
     var ix = gx * Math.max(0.12, 0.5 - R - 0.02)
     var iy = st.irisY + Math.max(-1, Math.min(1, gazeY)) * 0.12
@@ -238,82 +276,140 @@ Canvas {
     // clipped to it: Canvas clip() replaces the current clip instead of
     // intersecting, and restoring a nested clip drops the eye-shape clip.
     var irisDark = col("irisDark", "#8c1f3f")
-    // Flat shadow cap: the top of the circle down to a sagging edge.
-    var capY = -R * 0.1, capA = Math.asin(-capY / R)
-    ctx.fillStyle = irisDark
-    ctx.beginPath()
-    ctx.arc(0, 0, R, Math.PI + capA, 2 * Math.PI - capA, false)
-    ctx.quadraticCurveTo(0, capY + R * 0.28, -Math.cos(capA) * R, capY)
-    ctx.closePath()
-    ctx.fill()
-    // Halftone under the cap's edge.
-    var itone = []
-    for (var ir = 0; ir < 3; ir++) {
-      for (var ixg = -6; ixg <= 6; ixg++) {
-        var tx = (ixg + (ir % 2) * 0.5) * R * 0.16, ty = capY + R * 0.14 + ir * R * 0.14
-        if (tx * tx + ty * ty < R * R * 0.8) itone.push([tx, ty, R * 0.045 * (1 - ir / 3.2)])
-      }
-    }
-    dots(itone, irisDark)
-    // Light crescent: the bottom of the circle up to a bulging edge.
-    var creY = R * 0.4, creA = Math.asin(creY / R)
-    ctx.fillStyle = col("irisLight", "#ffb3a7")
-    ctx.beginPath()
-    ctx.arc(0, 0, R, creA, Math.PI - creA, false)
-    ctx.quadraticCurveTo(0, creY - R * 0.3, Math.cos(creA) * R, creY)
-    ctx.closePath()
-    ctx.fill()
-    // A few inked flecks radiating in the lower half.
-    ctx.strokeStyle = irisDark
-    ctx.lineWidth = R * 0.035
-    ctx.lineCap = "round"
-    for (var f = 0; f < 7; f++) {
-      var fa = Math.PI * (0.18 + f * 0.105)
+    var irisLight = col("irisLight", "#ffb3a7")
+    function ring(r, w, color) {
+      ctx.strokeStyle = color
+      ctx.lineWidth = w
       ctx.beginPath()
-      ctx.moveTo(Math.cos(fa) * R * 0.55, Math.sin(fa) * R * 0.55)
-      ctx.lineTo(Math.cos(fa) * R * 0.82, Math.sin(fa) * R * 0.82)
+      ctx.arc(0, 0, r, 0, Math.PI * 2)
       ctx.stroke()
     }
-
-    // Hypnotic rings.
-    if (st.rings) {
-      ctx.strokeStyle = lash
-      ctx.lineWidth = R * 0.04
-      for (var ri = 1; ri <= st.rings; ri++) {
+    // Flat shadow cap: the top of the circle down to a sagging edge.
+    function cap(withTone) {
+      var capY = -R * 0.1, capA = Math.asin(-capY / R)
+      ctx.fillStyle = irisDark
+      ctx.beginPath()
+      ctx.arc(0, 0, R, Math.PI + capA, 2 * Math.PI - capA, false)
+      ctx.quadraticCurveTo(0, capY + R * 0.28, -Math.cos(capA) * R, capY)
+      ctx.closePath()
+      ctx.fill()
+      if (!withTone) return
+      var itone = []
+      for (var ir = 0; ir < 3; ir++) {
+        for (var ixg = -6; ixg <= 6; ixg++) {
+          var tx = (ixg + (ir % 2) * 0.5) * R * 0.16, ty = capY + R * 0.14 + ir * R * 0.14
+          if (tx * tx + ty * ty < R * R * 0.8) itone.push([tx, ty, R * 0.045 * (1 - ir / 3.2)])
+        }
+      }
+      dots(itone, irisDark)
+    }
+    // Light crescent: the bottom of the circle up to a bulging edge.
+    function crescent(alpha) {
+      var creY = R * 0.4, creA = Math.asin(creY / R)
+      ctx.fillStyle = rgba(irisLight, alpha)
+      ctx.beginPath()
+      ctx.arc(0, 0, R, creA, Math.PI - creA, false)
+      ctx.quadraticCurveTo(0, creY - R * 0.3, Math.cos(creA) * R, creY)
+      ctx.closePath()
+      ctx.fill()
+    }
+    function flecks() {
+      ctx.strokeStyle = irisDark
+      ctx.lineWidth = R * 0.035
+      ctx.lineCap = "round"
+      for (var f = 0; f < 7; f++) {
+        var fa = Math.PI * (0.18 + f * 0.105)
         ctx.beginPath()
-        ctx.arc(0, 0, R * (0.3 + 0.6 * ri / (st.rings + 1)), 0, Math.PI * 2)
+        ctx.moveTo(Math.cos(fa) * R * 0.55, Math.sin(fa) * R * 0.55)
+        ctx.lineTo(Math.cos(fa) * R * 0.82, Math.sin(fa) * R * 0.82)
         ctx.stroke()
       }
     }
 
-    // Inked inner ring (the pink eyes in the reference art have one).
-    ctx.strokeStyle = rgba(lash, 0.85)
-    ctx.lineWidth = R * 0.045
-    ctx.beginPath()
-    ctx.arc(0, 0, R * 0.64, 0, Math.PI * 2)
-    ctx.stroke()
+    var pat = irs.pattern
+    if (pat === "cel") {
+      cap(true); crescent(1); flecks()
+      ring(R * 0.64, R * 0.045, rgba(lash, 0.85))
+    } else if (pat === "rings") {
+      cap(true); crescent(1)
+      var n = irs.rings || 3
+      for (var ri = 1; ri <= n; ri++) ring(R * (0.3 + 0.6 * ri / (n + 1)), R * 0.04, lash)
+    } else if (pat === "petal") {
+      // Blossom: petals of light fanned around the pupil.
+      cap(false)
+      ctx.fillStyle = irisLight
+      for (var pk = 0; pk < 8; pk++) {
+        ctx.save()
+        ctx.rotate(pk * Math.PI / 4 + Math.PI / 8)
+        ctx.beginPath()
+        ctx.ellipse(-R * 0.14, -R * 0.86, R * 0.28, R * 0.46)
+        ctx.fill()
+        ctx.restore()
+      }
+      ring(R * 0.42, R * 0.05, lash)
+    } else if (pat === "spiral") {
+      crescent(1)
+      ctx.strokeStyle = irisDark
+      ctx.lineWidth = R * 0.06
+      ctx.lineCap = "round"
+      ctx.beginPath()
+      for (var sp = 0; sp <= 90; sp++) {
+        var st2 = sp / 90, sr0 = R * (0.12 + 0.78 * st2), sa = st2 * Math.PI * 4.4
+        if (sp === 0) ctx.moveTo(Math.cos(sa) * sr0, Math.sin(sa) * sr0)
+        else ctx.lineTo(Math.cos(sa) * sr0, Math.sin(sa) * sr0)
+      }
+      ctx.stroke()
+    } else if (pat === "hollow") {
+      // Empty, dead-eyed stare: one flat dark disc and a faint ring.
+      ctx.fillStyle = irisDark
+      ctx.beginPath()
+      ctx.arc(0, 0, R, 0, Math.PI * 2)
+      ctx.fill()
+      crescent(0.35)
+      ring(R * 0.72, R * 0.05, rgba(irisLight, 0.55))
+    } else if (pat === "crosshair") {
+      cap(false); crescent(1)
+      ring(R * 0.56, R * 0.05, lash)
+      ctx.strokeStyle = lash
+      ctx.lineWidth = R * 0.045
+      ctx.lineCap = "butt"
+      for (var ch = 0; ch < 4; ch++) {
+        var ca = ch * Math.PI / 2
+        ctx.beginPath()
+        ctx.moveTo(Math.cos(ca) * R * 0.24, Math.sin(ca) * R * 0.24)
+        ctx.lineTo(Math.cos(ca) * R * 0.9, Math.sin(ca) * R * 0.9)
+        ctx.stroke()
+      }
+    } else if (pat === "pinpoint") {
+      crescent(1)
+      ring(R * 0.45, R * 0.06, lash)
+      ring(R * 0.78, R * 0.025, rgba(lash, 0.7))
+    }
 
-    // Pupil: theme slit wins, else the style's shape.
+    // Pupil.
     var ps = Math.max(0.5, Math.min(1.5, pupilScale))
+    var pr = R * (irs.pupilR || 0.4) * ps
     ctx.fillStyle = col("pupil", "#1c1f3f")
     ctx.beginPath()
-    if (col("slit", false)) {
+    if (pupilShape === "slit") {
       var pw = R * 0.2 * ps, ph = R * 1.5
       ctx.ellipse(-pw / 2, -ph / 2, pw, ph)
-    } else if (st.pupil === "tall") {
-      var tw = R * st.pupilR * 1.6 * ps, th = R * st.pupilR * 2.3 * ps
-      ctx.ellipse(-tw / 2, -th / 2, tw, th)
-    } else {
-      ctx.arc(0, 0, R * st.pupilR * ps, 0, Math.PI * 2)
+      ctx.fill()
+    } else if (pupilShape === "tall") {
+      ctx.ellipse(-pr * 0.8, -pr * 1.15, pr * 1.6, pr * 2.3)
+      ctx.fill()
+    } else if (pupilShape === "heart") {
+      ctx.moveTo(0, pr * 0.85)
+      ctx.bezierCurveTo(-pr * 1.25, 0, -pr * 0.65, -pr * 1.0, 0, -pr * 0.42)
+      ctx.bezierCurveTo(pr * 0.65, -pr * 1.0, pr * 1.25, 0, 0, pr * 0.85)
+      ctx.fill()
+    } else if (pupilShape !== "none") {
+      ctx.arc(0, 0, pr, 0, Math.PI * 2)
+      ctx.fill()
     }
-    ctx.fill()
 
     // Iris outline.
-    ctx.strokeStyle = lash
-    ctx.lineWidth = R * 0.085
-    ctx.beginPath()
-    ctx.arc(0, 0, R * 0.97, 0, Math.PI * 2)
-    ctx.stroke()
+    ring(R * 0.97, R * 0.085, lash)
     ctx.restore()
 
     // Highlights: flat, hard-edged, riding along with the iris.
@@ -331,11 +427,12 @@ Canvas {
       ctx.arc(x, y, r, 0, Math.PI * 2)
       ctx.fill()
     }
-    if (st.highlight === "big") {
+    var hlType = irs.highlight
+    if (hlType === "big") {
       oval(ix - hs * R * 0.35, iy - Rv * 0.4, R * 0.7, Rv * 0.55)
       oval(ix + hs * R * 0.38, iy + Rv * 0.42, R * 0.34, Rv * 0.26)
       dot(ix + hs * R * 0.05, iy + Rv * 0.12, R * 0.07)
-    } else if (st.highlight === "star") {
+    } else if (hlType === "star") {
       // Four-point sparkle over the pupil + a small dot.
       var sx = ix - hs * R * 0.12, sy = iy - Rv * 0.15, sr = R * 0.42, sn = sr * 0.18
       ctx.fillStyle = hl
@@ -347,9 +444,11 @@ Canvas {
       ctx.quadraticCurveTo(sx - sn, sy - sn, sx, sy - sr)
       ctx.fill()
       dot(ix + hs * R * 0.4, iy + Rv * 0.45, R * 0.09)
-    } else if (st.highlight === "soft") {
+    } else if (hlType === "soft") {
       oval(ix - hs * R * 0.4, iy - Rv * 0.35, R * 0.4, Rv * 0.3)
-    } else {
+    } else if (hlType === "tiny") {
+      dot(ix - hs * R * 0.38, iy - Rv * 0.4, R * 0.08)
+    } else if (hlType !== "none") {
       oval(ix - hs * R * 0.37, iy - Rv * 0.42, R * 0.5, Rv * 0.36)
       dot(ix + hs * R * 0.36, iy + Rv * 0.34, R * 0.1)
     }

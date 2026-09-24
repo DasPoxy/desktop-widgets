@@ -8,6 +8,8 @@
 #                                                        (window centre, only while active)
 #   {"type": "click", "x", "y", "win": {"x", "y", "w", "h", "title"} | null}
 #                                                        (only while active)
+#   {"type": "windows", "list": [{"x", "y", "w", "h", "title"}, ...]}
+#                                                        (visible windows, on change, only while active)
 #
 # Recording = Omarchy's recorder (gpu-screen-recorder), other CLI recorders,
 # or any screen capture going through xdg-desktop-portal (OBS, Discord,
@@ -172,6 +174,34 @@ def window_at(x, y):
     return best[1] if best else None
 
 
+def visible_windows():
+    mons = monitors()
+    visible_ws = {m['workspace'] for m in mons.values()}
+    out = []
+    for c in hypr('j/clients') or []:
+        if (c.get('workspace') or {}).get('id') not in visible_ws or c.get('hidden'):
+            continue
+        (x, y), (w, h) = c.get('at', [0, 0]), c.get('size', [0, 0])
+        if w > 40 and h > 40:
+            out.append({'x': x, 'y': y, 'w': w, 'h': h, 'title': c.get('title', '')})
+    return out
+
+
+def windows_loop():
+    last = None
+    while True:
+        if active:
+            wins = visible_windows()
+            key = json.dumps(wins, sort_keys=True)
+            if key != last:
+                last = key
+                emit({'type': 'windows', 'list': wins})
+            time.sleep(3)
+        else:
+            last = None
+            time.sleep(0.5)
+
+
 def on_click():
     pos = hypr('j/cursorpos')
     if not pos:
@@ -225,6 +255,6 @@ def stdin_loop():
 
 if __name__ == '__main__':
     emit({'type': 'monitors', 'list': monitors()})
-    for fn in (rec_loop, cursor_loop, event_loop):
+    for fn in (rec_loop, cursor_loop, event_loop, windows_loop):
         threading.Thread(target=fn, daemon=True).start()
     stdin_loop()

@@ -10,6 +10,7 @@ Item {
 
   property bool pair: false
   property string styleId: "classic"
+  property string irisStyle: "auto"
   property var theme: ({})
   property real gazeX: 0
   property real gazeY: 0
@@ -24,6 +25,7 @@ Item {
     height: eyes.height
     mirrored: true
     styleId: eyes.styleId
+    irisStyle: eyes.irisStyle
     theme: eyes.theme
     gazeX: eyes.gazeX
     gazeY: eyes.gazeY
@@ -37,6 +39,7 @@ Item {
     width: eyes.pair ? eyes.width * 0.42 : eyes.width
     height: eyes.height
     styleId: eyes.styleId
+    irisStyle: eyes.irisStyle
     theme: eyes.theme
     gazeX: eyes.gazeX
     gazeY: eyes.gazeY

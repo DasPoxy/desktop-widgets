@@ -43,6 +43,9 @@ WidgetCard {
   property bool pair: false
   property string eyeStyle: "classic"
   property bool examineClicks: true
+  property string irisStyle: "auto"
+  // Which menu sections are expanded, e.g. { style: true }. All start folded.
+  property var openSections: ({})
   property bool chaseFastMouse: true
 
   function applySavedSettings() {
@@ -52,6 +55,8 @@ WidgetCard {
     pair = getSetting("pair", false)
     eyeStyle = getSetting("eyeStyle", "classic")
     examineClicks = getSetting("examineClicks", true)
+    irisStyle = getSetting("irisStyle", "auto")
+    openSections = getSetting("openSections", {})
     chaseFastMouse = getSetting("chaseFastMouse", true)
   }
   onSettingsLoaded: applySavedSettings()
@@ -66,6 +71,37 @@ WidgetCard {
     warden.pair = v
     warden.saveSetting("pair", v)
   }
+  function setIrisStyle(id) {
+    warden.irisStyle = id
+    warden.saveSetting("irisStyle", id)
+  }
+  function toggleSection(key) {
+    var next = Object.assign({}, warden.openSections)
+    next[key] = !next[key]
+    warden.openSections = next
+    warden.saveSetting("openSections", next)
+  }
+  function nameOf(list, id) {
+    for (var i = 0; i < list.length; i++) if (list[i].id === id) return list[i].name
+    return ""
+  }
+
+  // Patterns live in AbyssEye.qml; these are the menu names, in menu order.
+  readonly property var irisStyles: [
+    { id: "auto", name: "Match Eye" },
+    { id: "cel", name: "Cel" },
+    { id: "sparkle", name: "Sparkle" },
+    { id: "star", name: "Starlight" },
+    { id: "rings", name: "Rings" },
+    { id: "blossom", name: "Blossom" },
+    { id: "spiral", name: "Spiral" },
+    { id: "hollow", name: "Hollow" },
+    { id: "crosshair", name: "Crosshair" },
+    { id: "heart", name: "Heart" },
+    { id: "pinpoint", name: "Pinpoint" },
+    { id: "slit", name: "Slit" }
+  ]
+
   function setEyeStyle(id) {
     warden.eyeStyle = id
     warden.saveSetting("eyeStyle", id)
@@ -183,6 +219,8 @@ WidgetCard {
           warden.handleCursor(msg.x, msg.y)
         } else if (msg.type === "activity") {
           warden.handleActivity(msg.x, msg.y)
+        } else if (msg.type === "windows") {
+          warden.windowsList = msg.list || []
         } else if (msg.type === "click") {
           warden.handleClick(msg.x, msg.y, msg.win || null)
         }
@@ -214,7 +252,9 @@ WidgetCard {
   // (straight at the viewer, pupils dilated), travel (floating: look where
   // it's drifting to), examine (a click: narrow in on the spot, then scan
   // the clicked window; floating flies over first), hurry (rapid mouse
-  // movement: freeze and stare, pupils snap small; floating rushes over).
+  // movement: freeze and stare, pupils snap small; floating rushes over),
+  // scan (instead of following the mouse it sometimes wanders off to trace
+  // the edge of a window or check the bar, then comes back to the mouse).
   // ---------------------------------------------------------------------------
   property string mode: "wander"
   property real lookX: 0          // global point for window/travel modes
@@ -313,7 +353,11 @@ WidgetCard {
     var recentMouse = Date.now() - lastCursorMove < 1500
     var r = Math.random()
     var cursorW = recentMouse ? 0.55 : 0.3
-    if (r < cursorW) mode = "cursor"
+    if (r < cursorW) {
+      // Now and then, get distracted before going back to the mouse.
+      if (Math.random() < 0.3 && startSurvey()) return
+      mode = "cursor"
+    }
     else if (r < cursorW + 0.3) { mode = "wander"; saccade() }
     else mode = "stare"
     pupilTarget = mode === "stare" ? 1.28 : 1.0
@@ -361,7 +405,7 @@ WidgetCard {
   }
 
   function handleActivity(x, y) {
-    if (!awake || mode === "travel" || mode === "examine" || mode === "hurry") return
+    if (!awake || mode === "travel" || mode === "examine" || mode === "hurry" || mode === "scan") return
     var now = Date.now()
     if (now - lastActivity < 2500 || Math.random() > 0.8) return
     lastActivity = now
@@ -456,7 +500,7 @@ WidgetCard {
   property real lastCursorT: 0
   property real cursorSpeed: 0
   property real lastRapid: 0
-  readonly property real rapidSpeed: 2400   // px/s, smoothed
+  readonly property real rapidSpeed: 4200   // px/s, smoothed -- a real flick, not normal use
 
   function handleCursor(x, y) {
     var dx = x - cursorX, dy = y - cursorY
@@ -527,6 +571,101 @@ WidgetCard {
     }
   }
 
+  // --- Surveys: trace a window's edge or sweep along the bar
+  property var windowsList: []
+  property var scanPts: []
+  property int scanIdx: 0
+  property string scanKind: ""
+
+  // Returns false when there's nothing to survey (caller falls back).
+  function startSurvey() {
+    var bar = barLine()
+    var canEdge = windowsList.length > 0
+    if (!canEdge && !bar) return false
+    var pts = []
+    if (canEdge && (!bar || Math.random() < 0.6)) {
+      scanKind = "edge"
+      var w = windowsList[Math.floor(Math.random() * windowsList.length)]
+      var inset = 8
+      var corners = [[w.x + inset, w.y + inset], [w.x + w.w - inset, w.y + inset],
+                     [w.x + w.w - inset, w.y + w.h - inset], [w.x + inset, w.y + w.h - inset]]
+      // Two adjacent edges, clockwise or back the other way.
+      var start = Math.floor(Math.random() * 4), dir = Math.random() < 0.5 ? 1 : 3
+      for (var e = 0; e < 2; e++) {
+        var a = corners[(start + e * dir) % 4], b = corners[(start + (e + 1) * dir) % 4]
+        for (var k = (e === 0 ? 0 : 1); k <= 5; k++) pts.push([a[0] + (b[0] - a[0]) * k / 5, a[1] + (b[1] - a[1]) * k / 5])
+      }
+    } else {
+      scanKind = "bar"
+      // Sweep part of the bar, left-to-right or back.
+      var from = Math.random() * 0.4, to = 0.6 + Math.random() * 0.4
+      if (Math.random() < 0.5) { var t = from; from = to; to = t }
+      for (var i = 0; i <= 7; i++) pts.push([bar.x0 + (bar.x1 - bar.x0) * (from + (to - from) * i / 7), bar.y])
+    }
+    scanPts = pts
+    scanIdx = 0
+    lookX = pts[0][0]
+    lookY = pts[0][1]
+    mode = "scan"
+    squint = 0.45
+    pupilTarget = 1.05
+    modeTimer.stop()
+    if (floating) {
+      driftTimer.stop()
+      approachScan()
+    }
+    return true
+  }
+
+  // Middle line of the bar: whichever screen edge has a reserved strip.
+  function barLine() {
+    var m = monitor, r = reserved
+    if (r[1] > 0) return { x0: m.x + 20, x1: m.x + m.w - 20, y: m.y + r[1] / 2 }
+    if (r[3] > 0) return { x0: m.x + 20, x1: m.x + m.w - 20, y: m.y + m.h - r[3] / 2 }
+    return null
+  }
+
+  // Floating: go and have a look -- right under the bar, or just beside the
+  // first point of the window edge.
+  function approachScan() {
+    var ox = monitor.x + reserved[0], oy = monitor.y + reserved[1]
+    var p = scanPts[scanIdx]
+    if (scanKind === "bar") {
+      var ny = reserved[1] > 0 ? 8 : floatAreaH - height - 8
+      moveEyeTo(p[0] - ox - width / 2, ny, scanIdx === 0 ? 800 : 320, Easing.InOutSine, "scan")
+    } else if (scanIdx === 0) {
+      moveEyeTo(p[0] - ox - width / 2, p[1] - oy + 40, 800, Easing.OutCubic, "scan")
+    }
+  }
+
+  Timer {
+    running: warden.awake && warden.mode === "scan"
+    interval: 500
+    repeat: true
+    onTriggered: {
+      interval = 380 + Math.random() * 260
+      warden.scanIdx++
+      if (warden.scanIdx >= warden.scanPts.length) {
+        warden.endSurvey()
+        return
+      }
+      warden.lookX = warden.scanPts[warden.scanIdx][0]
+      warden.lookY = warden.scanPts[warden.scanIdx][1]
+      // Glide along under the bar while sweeping it.
+      if (warden.floating && warden.scanKind === "bar") warden.approachScan()
+    }
+  }
+
+  // Back to the mouse.
+  function endSurvey() {
+    mode = "cursor"
+    squint = 0
+    pupilTarget = 1.0
+    modeTimer.interval = 2500 + Math.random() * 2000
+    modeTimer.restart()
+    resumeDrift()
+  }
+
   // --- Geometry: where the eye is, in global (Hyprland) coordinates
   readonly property var monitor: {
     var m = monitorsMap[monitorName]
@@ -565,14 +704,15 @@ WidgetCard {
       tx = wanderX; ty = wanderY
     } else if (mode === "cursor" || mode === "hurry") {
       var d = directionTo(cursorX, cursorY); tx = d.x; ty = d.y
-    } else if (mode === "window" || mode === "travel" || mode === "examine") {
+    } else if (mode === "window" || mode === "travel" || mode === "examine" || mode === "scan") {
       var w = directionTo(lookX, lookY); tx = w.x; ty = w.y
     }
     tx += jitterX
     ty += jitterY
     // Following the mouse is smooth pursuit; everything else is a quick
     // saccade.
-    var k = 1 - Math.exp(-dt * (mode === "cursor" ? 9 : (mode === "hurry" ? 18 : 22)))
+    // Scanning an edge is a slow, smooth trace.
+    var k = 1 - Math.exp(-dt * (mode === "cursor" ? 9 : (mode === "hurry" ? 18 : (mode === "scan" ? 7 : 22))))
     gazeX += (tx - gazeX) * k
     gazeY += (ty - gazeY) * k
     pupil += (pupilTarget - pupil) * (1 - Math.exp(-dt * 5))
@@ -662,7 +802,7 @@ WidgetCard {
 
   Timer {
     id: driftTimer
-    onTriggered: if (warden.awake && warden.floating && warden.mode !== "examine" && warden.mode !== "hurry") warden.drift()
+    onTriggered: if (warden.awake && warden.floating && warden.mode !== "examine" && warden.mode !== "hurry" && warden.mode !== "scan") warden.drift()
   }
 
   onFloatingChanged: if (floating && awake) placeFloatRandomly()
@@ -704,6 +844,7 @@ WidgetCard {
         height: warden.height
         pair: warden.pair
         styleId: warden.eyeStyle
+        irisStyle: warden.irisStyle
         theme: warden.theme
         gazeX: warden.gazeX
         gazeY: warden.gazeY
@@ -729,6 +870,7 @@ WidgetCard {
     anchors.margins: 4
     pair: warden.pair
     styleId: warden.eyeStyle
+    irisStyle: warden.irisStyle
     theme: warden.theme
     gazeX: warden.floating ? 0 : warden.gazeX
     gazeY: warden.floating ? 0 : warden.gazeY
@@ -806,6 +948,57 @@ WidgetCard {
       hoverEnabled: true
       cursorShape: Qt.PointingHandCursor
       onClicked: toggleRow.toggled()
+    }
+  }
+
+  // Foldable section title: shows the current pick and a chevron.
+  component SectionHeader: Rectangle {
+    id: sectionRow
+    property string label: ""
+    property string value: ""
+    property bool open: false
+    signal toggled()
+    Layout.fillWidth: true
+    Layout.topMargin: Style.space(2)
+    implicitHeight: 24
+    radius: 6
+    color: sectionMouse.containsMouse ? Qt.rgba(1, 1, 1, 0.05) : "transparent"
+
+    RowLayout {
+      anchors.fill: parent
+      anchors.leftMargin: Style.space(8)
+      anchors.rightMargin: Style.space(8)
+      spacing: Style.space(6)
+
+      Text {
+        text: sectionRow.label
+        font.family: Style.font.family
+        font.pixelSize: 9
+        font.weight: Font.Bold
+        color: Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.45)
+      }
+      Text {
+        Layout.fillWidth: true
+        text: sectionRow.value
+        elide: Text.ElideRight
+        font.family: Style.font.family
+        font.pixelSize: 9
+        color: Color.accent
+      }
+      Text {
+        text: sectionRow.open ? "\uf077" : "\uf078"
+        font.family: Style.font.family
+        font.pixelSize: 9
+        color: Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.55)
+      }
+    }
+
+    MouseArea {
+      id: sectionMouse
+      anchors.fill: parent
+      hoverEnabled: true
+      cursorShape: Qt.PointingHandCursor
+      onClicked: sectionRow.toggled()
     }
   }
 
@@ -950,19 +1143,16 @@ WidgetCard {
         }
       }
 
-      Text {
-        Layout.fillWidth: true
-        Layout.leftMargin: Style.space(8)
-        Layout.topMargin: Style.space(4)
-        text: "EYE STYLE"
-        font.family: Style.font.family
-        font.pixelSize: 9
-        font.weight: Font.Bold
-        color: Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.45)
+      SectionHeader {
+        label: "EYE STYLE"
+        value: warden.nameOf(warden.eyeStyles, warden.eyeStyle)
+        open: !!warden.openSections.style
+        onToggled: warden.toggleSection("style")
       }
 
-      // Each chip previews its shape in the current theme.
+      // Each chip previews its shape in the current theme and iris.
       GridLayout {
+        visible: !!warden.openSections.style
         Layout.fillWidth: true
         Layout.leftMargin: Style.space(4)
         Layout.rightMargin: Style.space(4)
@@ -991,6 +1181,7 @@ WidgetCard {
               width: parent.width - 8
               height: 30
               styleId: modelData.id
+              irisStyle: warden.irisStyle
               theme: warden.theme
               glow: 0
             }
@@ -1015,18 +1206,78 @@ WidgetCard {
         }
       }
 
-      Text {
+      SectionHeader {
+        label: "IRIS STYLE"
+        value: warden.nameOf(warden.irisStyles, warden.irisStyle)
+        open: !!warden.openSections.iris
+        onToggled: warden.toggleSection("iris")
+      }
+
+      // Each chip previews the iris in the current eye style and theme.
+      GridLayout {
+        visible: !!warden.openSections.iris
         Layout.fillWidth: true
-        Layout.leftMargin: Style.space(8)
-        Layout.topMargin: Style.space(4)
-        text: "EYE THEME"
-        font.family: Style.font.family
-        font.pixelSize: 9
-        font.weight: Font.Bold
-        color: Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.45)
+        Layout.leftMargin: Style.space(4)
+        Layout.rightMargin: Style.space(4)
+        columns: 3
+        columnSpacing: Style.space(4)
+        rowSpacing: Style.space(4)
+
+        Repeater {
+          model: warden.irisStyles
+
+          Rectangle {
+            required property var modelData
+            readonly property bool selected: warden.irisStyle === modelData.id
+            Layout.fillWidth: true
+            implicitHeight: 50
+            radius: 6
+            color: selected ? Qt.rgba(Color.accent.r, Color.accent.g, Color.accent.b, 0.22)
+              : (irisMouse.containsMouse ? Qt.rgba(1, 1, 1, 0.06) : "transparent")
+            border.color: selected ? Color.accent : "transparent"
+            border.width: 1
+
+            AbyssEye {
+              anchors.top: parent.top
+              anchors.topMargin: 3
+              anchors.horizontalCenter: parent.horizontalCenter
+              width: parent.width - 8
+              height: 30
+              styleId: warden.eyeStyle
+              irisStyle: modelData.id
+              theme: warden.theme
+              glow: 0
+            }
+            Text {
+              anchors.bottom: parent.bottom
+              anchors.bottomMargin: 3
+              anchors.horizontalCenter: parent.horizontalCenter
+              text: modelData.name
+              font.family: Style.font.family
+              font.pixelSize: 9
+              color: parent.selected ? Color.accent : Color.foreground
+            }
+
+            MouseArea {
+              id: irisMouse
+              anchors.fill: parent
+              hoverEnabled: true
+              cursorShape: Qt.PointingHandCursor
+              onClicked: warden.setIrisStyle(modelData.id)
+            }
+          }
+        }
+      }
+
+      SectionHeader {
+        label: "EYE THEME"
+        value: warden.theme.name
+        open: !!warden.openSections.theme
+        onToggled: warden.toggleSection("theme")
       }
 
       GridLayout {
+        visible: !!warden.openSections.theme
         Layout.fillWidth: true
         Layout.leftMargin: Style.space(4)
         Layout.rightMargin: Style.space(4)
