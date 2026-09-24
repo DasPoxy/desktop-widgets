@@ -42,6 +42,8 @@ WidgetCard {
   property bool showCard: false
   property bool pair: false
   property string eyeStyle: "classic"
+  property bool examineClicks: true
+  property bool chaseFastMouse: true
 
   function applySavedSettings() {
     themeId = getSetting("themeId", "system")
@@ -49,6 +51,8 @@ WidgetCard {
     showCard = getSetting("showCard", false)
     pair = getSetting("pair", false)
     eyeStyle = getSetting("eyeStyle", "classic")
+    examineClicks = getSetting("examineClicks", true)
+    chaseFastMouse = getSetting("chaseFastMouse", true)
   }
   onSettingsLoaded: applySavedSettings()
   onRootRefChanged: applySavedSettings()
@@ -176,12 +180,11 @@ WidgetCard {
         } else if (msg.type === "monitors") {
           warden.monitorsMap = msg.list || {}
         } else if (msg.type === "cursor") {
-          var moved = Math.abs(msg.x - warden.cursorX) + Math.abs(msg.y - warden.cursorY)
-          warden.cursorX = msg.x
-          warden.cursorY = msg.y
-          if (moved > 40) warden.lastCursorMove = Date.now()
+          warden.handleCursor(msg.x, msg.y)
         } else if (msg.type === "activity") {
           warden.handleActivity(msg.x, msg.y)
+        } else if (msg.type === "click") {
+          warden.handleClick(msg.x, msg.y, msg.win || null)
         }
       }
     }
@@ -209,7 +212,9 @@ WidgetCard {
   // 🧠 Behaviour -- modes: cursor (track the mouse), window (look at a window
   // that just changed), wander (quick saccades to random spots), stare
   // (straight at the viewer, pupils dilated), travel (floating: look where
-  // it's drifting to).
+  // it's drifting to), examine (a click: narrow in on the spot, then scan
+  // the clicked window; floating flies over first), hurry (rapid mouse
+  // movement: freeze and stare, pupils snap small; floating rushes over).
   // ---------------------------------------------------------------------------
   property string mode: "wander"
   property real lookX: 0          // global point for window/travel modes
@@ -219,6 +224,10 @@ WidgetCard {
   property real jitterX: 0
   property real jitterY: 0
   property real lastActivity: 0
+  // Scrutinising squint (0..1), narrows the eye while examining.
+  property real squint: 0
+  Behavior on squint { NumberAnimation { duration: 260; easing.type: Easing.OutCubic } }
+  readonly property real shownOpenness: openness * (1 - 0.22 * squint)
 
   property real gazeX: 0
   property real gazeY: 0
@@ -241,6 +250,11 @@ WidgetCard {
       modeTimer.stop()
       blinkTimer.stop()
       floatAnim.stop()
+      driftTimer.stop()
+      rushDelay.stop()
+      examineLook.stop()
+      squint = 0
+      mode = "wander"
       sleepAnim.restart()
     }
   }
@@ -295,6 +309,7 @@ WidgetCard {
   }
 
   function pickMode() {
+    squint = 0
     var recentMouse = Date.now() - lastCursorMove < 1500
     var r = Math.random()
     var cursorW = recentMouse ? 0.55 : 0.3
@@ -316,7 +331,12 @@ WidgetCard {
   Timer {
     id: modeTimer
     interval: 3000
-    onTriggered: if (warden.awake) warden.pickMode()
+    onTriggered: {
+      if (!warden.awake) return
+      var wasBusy = warden.mode === "examine"
+      warden.pickMode()
+      if (wasBusy) warden.resumeDrift()
+    }
   }
 
   Timer {
@@ -341,7 +361,7 @@ WidgetCard {
   }
 
   function handleActivity(x, y) {
-    if (!awake || mode === "travel") return
+    if (!awake || mode === "travel" || mode === "examine" || mode === "hurry") return
     var now = Date.now()
     if (now - lastActivity < 2500 || Math.random() > 0.8) return
     lastActivity = now
@@ -353,6 +373,158 @@ WidgetCard {
     pupilTarget = 1.0
     modeTimer.interval = 2000 + Math.random() * 1600
     modeTimer.restart()
+  }
+
+  // --- Clicks: take an interest in what was clicked
+  property real examineX: 0
+  property real examineY: 0
+  property var examineWin: null
+  property bool examineSettled: false
+  property real lastClick: 0
+
+  function handleClick(x, y, win) {
+    if (!awake || !examineClicks) return
+    var now = Date.now()
+    // A double-click (or clicks right next to each other) is one event.
+    if (now - lastClick < 450 && Math.abs(x - examineX) + Math.abs(y - examineY) < 60) return
+    lastClick = now
+    examineX = x
+    examineY = y
+    examineWin = win
+    lookX = x
+    lookY = y
+    mode = "examine"
+    squint = 1
+    pupil = 0.8            // quick focus...
+    pupilTarget = 1.18     // ...then widen with interest
+    blinkAnim.stop()
+    modeTimer.stop()
+    if (floating) {
+      examineSettled = false
+      driftTimer.stop()
+      travelToExamine()
+    } else {
+      startExamining()
+    }
+  }
+
+  function startExamining() {
+    examineSettled = false
+    examineLook.restart()   // hold on the click point first
+    modeTimer.interval = 3200 + Math.random() * 2600
+    modeTimer.restart()
+  }
+
+  // After a beat on the click point, scan around the clicked window.
+  Timer {
+    id: examineLook
+    interval: 700
+    onTriggered: if (warden.mode === "examine") warden.examineSettled = true
+  }
+
+  Timer {
+    running: warden.awake && warden.mode === "examine" && warden.examineSettled
+    interval: 700
+    repeat: true
+    onTriggered: {
+      interval = 450 + Math.random() * 650
+      var w = warden.examineWin
+      if (Math.random() < 0.35) {
+        warden.lookX = warden.examineX
+        warden.lookY = warden.examineY
+      } else if (w && w.w > 0) {
+        warden.lookX = w.x + w.w * (0.1 + Math.random() * 0.8)
+        warden.lookY = w.y + w.h * (0.1 + Math.random() * 0.8)
+      } else {
+        warden.lookX = warden.examineX + (Math.random() - 0.5) * 320
+        warden.lookY = warden.examineY + (Math.random() - 0.5) * 220
+      }
+    }
+  }
+
+  // Floating: go and sit beside the click (on whichever side has room, a
+  // little above), not on top of it.
+  function travelToExamine() {
+    var ox = monitor.x + reserved[0], oy = monitor.y + reserved[1]
+    var side = (examineX - ox) > floatAreaW / 2 ? -1 : 1
+    var cx = examineX + side * (width * 0.5 + 70)
+    var cy = examineY - height * 0.45
+    moveEyeTo(cx - ox - width / 2, cy - oy - height / 2, 950, Easing.OutCubic, "examine")
+  }
+
+  // --- Rapid mouse movement: stop, look, (floating) hurry over
+  property real lastCursorT: 0
+  property real cursorSpeed: 0
+  property real lastRapid: 0
+  readonly property real rapidSpeed: 2400   // px/s, smoothed
+
+  function handleCursor(x, y) {
+    var dx = x - cursorX, dy = y - cursorY
+    var dist = Math.sqrt(dx * dx + dy * dy)
+    var now = Date.now()
+    var dt = (now - lastCursorT) / 1000
+    lastCursorT = now
+    cursorX = x
+    cursorY = y
+    if (dist > 40) lastCursorMove = now
+    if (dt <= 0 || dt > 0.4) { cursorSpeed = 0; return }
+    cursorSpeed = cursorSpeed * 0.55 + (dist / dt) * 0.45
+    if (awake && chaseFastMouse && cursorSpeed > rapidSpeed) handleRapidMovement()
+  }
+
+  function handleRapidMovement() {
+    lastRapid = Date.now()
+    if (mode === "hurry") return
+    // Freeze and stare: whatever it was doing stops.
+    mode = "hurry"
+    squint = 0
+    pupil = 0.62
+    pupilTarget = 0.82
+    blinkAnim.stop()
+    openness = 1
+    modeTimer.stop()
+    examineLook.stop()
+    if (floating) {
+      floatAnim.stop()
+      driftTimer.stop()
+      rushDelay.restart()   // the "stop and look" beat, then hurry over
+    }
+  }
+
+  Timer {
+    id: rushDelay
+    interval: 280
+    onTriggered: if (warden.mode === "hurry") warden.rushToCursor()
+  }
+
+  // Stop short of the cursor, on the side the eye is coming from.
+  function rushToCursor() {
+    var c = eyeCenter()
+    var dx = c.x - cursorX, dy = c.y - cursorY
+    var d = Math.sqrt(dx * dx + dy * dy)
+    if (d < 1) { dx = 1; dy = 0; d = 1 }
+    var stand = Math.max(width, height) * 0.5 + 90
+    if (d < stand + 40) return
+    var tx = cursorX + dx / d * stand, ty = cursorY + dy / d * stand
+    var ox = monitor.x + reserved[0], oy = monitor.y + reserved[1]
+    moveEyeTo(tx - ox - width / 2, ty - oy - height / 2, 1500, Easing.OutQuad, "hurry")
+  }
+
+  // While the flurry lasts keep up with the cursor; once it has been calm
+  // for a couple of seconds, go back to normal.
+  Timer {
+    running: warden.awake && warden.mode === "hurry"
+    interval: 350
+    repeat: true
+    onTriggered: {
+      var calm = Date.now() - warden.lastRapid
+      if (calm > 2200) {
+        warden.pickMode()
+        warden.resumeDrift()
+      } else if (warden.floating && !rushDelay.running && calm < 900) {
+        warden.rushToCursor()
+      }
+    }
   }
 
   // --- Geometry: where the eye is, in global (Hyprland) coordinates
@@ -391,16 +563,16 @@ WidgetCard {
     var tx = 0, ty = 0
     if (mode === "wander") {
       tx = wanderX; ty = wanderY
-    } else if (mode === "cursor") {
+    } else if (mode === "cursor" || mode === "hurry") {
       var d = directionTo(cursorX, cursorY); tx = d.x; ty = d.y
-    } else if (mode === "window" || mode === "travel") {
+    } else if (mode === "window" || mode === "travel" || mode === "examine") {
       var w = directionTo(lookX, lookY); tx = w.x; ty = w.y
     }
     tx += jitterX
     ty += jitterY
     // Following the mouse is smooth pursuit; everything else is a quick
     // saccade.
-    var k = 1 - Math.exp(-dt * (mode === "cursor" ? 9 : 22))
+    var k = 1 - Math.exp(-dt * (mode === "cursor" ? 9 : (mode === "hurry" ? 18 : 22)))
     gazeX += (tx - gazeX) * k
     gazeY += (ty - gazeY) * k
     pupil += (pupilTarget - pupil) * (1 - Math.exp(-dt * 5))
@@ -439,17 +611,36 @@ WidgetCard {
     }
     nx = Math.max(0, Math.min(maxX, nx))
     ny = Math.max(0, Math.min(maxY, ny))
-    var dist = Math.sqrt((nx - floatX) * (nx - floatX) + (ny - floatY) * (ny - floatY))
-    floatAnimX.to = nx
-    floatAnimY.to = ny
-    floatAnimX.duration = floatAnimY.duration = Math.max(1500, dist / 220 * 1000)
     // Look where it's going.
     lookX = monitor.x + reserved[0] + nx + width / 2
     lookY = monitor.y + reserved[1] + ny + height / 2
     mode = "travel"
     pupilTarget = 1.0
     modeTimer.stop()
+    moveEyeTo(nx, ny, 220, Easing.InOutSine, "travel")
+  }
+
+  // Shared mover for the floating eye(s): x/y are float-area coordinates of
+  // the top-left corner, speed in px/s.
+  property string moveReason: ""
+  function moveEyeTo(nx, ny, speed, easing, reason) {
+    var maxX = Math.max(0, floatAreaW - width), maxY = Math.max(0, floatAreaH - height)
+    nx = Math.max(0, Math.min(maxX, nx))
+    ny = Math.max(0, Math.min(maxY, ny))
+    var dist = Math.sqrt((nx - floatX) * (nx - floatX) + (ny - floatY) * (ny - floatY))
+    floatAnim.stop()
+    floatAnimX.to = nx
+    floatAnimY.to = ny
+    floatAnimX.easing.type = floatAnimY.easing.type = easing
+    floatAnimX.duration = floatAnimY.duration = Math.max(reason === "travel" ? 1500 : 320, dist / speed * 1000)
+    moveReason = reason
     floatAnim.restart()
+  }
+
+  function resumeDrift() {
+    if (!floating || !awake) return
+    driftTimer.interval = 2500 + Math.random() * 5000
+    driftTimer.restart()
   }
 
   ParallelAnimation {
@@ -458,16 +649,20 @@ WidgetCard {
     NumberAnimation { id: floatAnimY; target: warden; property: "floatY"; easing.type: Easing.InOutSine }
     onFinished: {
       if (!warden.awake) return
-      warden.pickMode()
-      driftTimer.interval = 5000 + Math.random() * 8000
-      driftTimer.restart()
+      if (warden.moveReason === "examine" && warden.mode === "examine") {
+        warden.startExamining()
+      } else if (warden.moveReason === "travel") {
+        warden.pickMode()
+        driftTimer.interval = 5000 + Math.random() * 8000
+        driftTimer.restart()
+      }
+      // "hurry": the hurry timer decides what happens next.
     }
   }
 
   Timer {
     id: driftTimer
-    running: warden.awake && warden.floating
-    onTriggered: warden.drift()
+    onTriggered: if (warden.awake && warden.floating && warden.mode !== "examine" && warden.mode !== "hurry") warden.drift()
   }
 
   onFloatingChanged: if (floating && awake) placeFloatRandomly()
@@ -512,7 +707,7 @@ WidgetCard {
         theme: warden.theme
         gazeX: warden.gazeX
         gazeY: warden.gazeY
-        openness: warden.openness
+        openness: warden.shownOpenness
         pupilScale: warden.pupil
         glow: warden.glowLevel
       }
@@ -537,7 +732,7 @@ WidgetCard {
     theme: warden.theme
     gazeX: warden.floating ? 0 : warden.gazeX
     gazeY: warden.floating ? 0 : warden.gazeY
-    openness: warden.floating ? 0 : warden.openness
+    openness: warden.floating ? 0 : warden.shownOpenness
     pupilScale: warden.pupil
     glow: warden.floating ? 0 : warden.glowLevel
 
@@ -688,6 +883,20 @@ WidgetCard {
         label: "Card Background"
         checked: warden.showCard
         onToggled: warden.toggleSetting("showCard")
+      }
+
+      MenuToggle {
+        glyph: "󰍽"
+        label: "Examine Clicks"
+        checked: warden.examineClicks
+        onToggled: warden.toggleSetting("examineClicks")
+      }
+
+      MenuToggle {
+        glyph: "󰁔"
+        label: "Chase Fast Mouse"
+        checked: warden.chaseFastMouse
+        onToggled: warden.toggleSetting("chaseFastMouse")
       }
 
       Text {

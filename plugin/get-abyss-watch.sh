@@ -6,11 +6,18 @@
 #   {"type": "cursor", "x": int, "y": int}              (global, only while active)
 #   {"type": "activity", "kind": str, "x": int, "y": int, "title": str}
 #                                                        (window centre, only while active)
+#   {"type": "click", "x", "y", "win": {"x", "y", "w", "h", "title"} | null}
+#                                                        (only while active)
 #
 # Recording = Omarchy's recorder (gpu-screen-recorder), other CLI recorders,
 # or any screen capture going through xdg-desktop-portal (OBS, Discord,
 # browser screen share...), which shows up as a PipeWire Video/Source node
 # that isn't a camera.
+#
+# Clicks come from a non-consuming Hyprland bind in ~/.config/hypr/bindings.lua:
+#   hl.bind("mouse:272", hl.dsp.event("abyss-click"), { non_consuming = true })
+# which shows up here as "custom>>abyss-click" -- no process per click, and
+# no access to raw input devices needed.
 #
 # stdin commands: "active 1" / "active 0" -- cursor + window activity are
 # only sampled while the eye is awake, so an idle widget costs one cheap
@@ -147,6 +154,32 @@ def window_centre(address):
     return None
 
 
+def window_at(x, y):
+    # Topmost visible window under the point: floating before tiled, then
+    # most recently focused.
+    mons = monitors()
+    visible_ws = {m['workspace'] for m in mons.values()}
+    best = None
+    for c in hypr('j/clients') or []:
+        if (c.get('workspace') or {}).get('id') not in visible_ws or c.get('hidden'):
+            continue
+        (cx, cy), (w, h) = c.get('at', [0, 0]), c.get('size', [0, 0])
+        if not (cx <= x < cx + w and cy <= y < cy + h):
+            continue
+        rank = (0 if c.get('floating') else 1, c.get('focusHistoryID', 99))
+        if best is None or rank < best[0]:
+            best = (rank, {'x': cx, 'y': cy, 'w': w, 'h': h, 'title': c.get('title', '')})
+    return best[1] if best else None
+
+
+def on_click():
+    pos = hypr('j/cursorpos')
+    if not pos:
+        return
+    x, y = pos.get('x', 0), pos.get('y', 0)
+    emit({'type': 'click', 'x': x, 'y': y, 'win': window_at(x, y)})
+
+
 def event_loop():
     last_title = {}
     while True:
@@ -156,6 +189,10 @@ def event_loop():
             f = s.makefile('r', encoding='utf-8', errors='replace')
             for line in f:
                 name, _, data = line.strip().partition('>>')
+                if name == 'custom' and data == 'abyss-click':
+                    if active:
+                        on_click()
+                    continue
                 if name.startswith('monitor'):
                     emit({'type': 'monitors', 'list': monitors()})
                     continue
