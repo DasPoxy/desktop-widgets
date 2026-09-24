@@ -71,6 +71,63 @@ WidgetCard {
   readonly property string shownGlyph: glyphText || defaultGlyph
   readonly property bool headerShown: pickerOpen || !!(rootRef && rootRef.layoutEditMode) || !titleHidden || !glyphHidden
 
+  // Glyph picker: every icon glyph in the system font (get-glyphs.sh reads
+  // them, with their Nerd Font names, straight from the font file). Loaded
+  // the first time the dropdown opens.
+  property bool glyphPickerOpen: false
+  property var glyphList: []            // [[codepoint, name], ...]
+  property string glyphStatus: "idle"   // idle | loading | ok | error
+  property string glyphQuery: ""
+  property string glyphHoverName: ""
+  readonly property var filteredGlyphs: {
+    var q = glyphQuery.trim().toLowerCase()
+    if (!q) return glyphList
+    var terms = q.split(/\s+/)
+    return glyphList.filter(function(g) {
+      var n = g[1].toLowerCase()
+      for (var i = 0; i < terms.length; i++) if (n.indexOf(terms[i]) < 0) return false
+      return true
+    })
+  }
+  readonly property int shownGlyphCode: shownGlyph ? shownGlyph.codePointAt(0) : 0
+  readonly property string shownGlyphName: {
+    for (var i = 0; i < glyphList.length; i++) if (glyphList[i][0] === shownGlyphCode) return glyphList[i][1]
+    return glyphText ? "custom" : "default"
+  }
+
+  readonly property string glyphsScriptPath: {
+    var u = Qt.resolvedUrl("../get-glyphs.sh").toString()
+    return decodeURIComponent(u.replace(/^file:\/\//, ""))
+  }
+  function toggleGlyphPicker() {
+    glyphPickerOpen = !glyphPickerOpen
+    if (glyphPickerOpen && glyphStatus !== "ok" && !glyphProc.running) {
+      glyphStatus = "loading"
+      glyphProc.command = [glyphsScriptPath, Style.font.family]
+      glyphProc.running = true
+    }
+  }
+  function pickGlyph(cp) {
+    setHeaderSetting("glyphText", cp ? String.fromCodePoint(cp) : "")
+    if (glyphHidden) setHeaderSetting("glyphHidden", false)
+  }
+
+  Process {
+    id: glyphProc
+    running: false
+    stdout: StdioCollector {
+      onStreamFinished: {
+        try {
+          var res = JSON.parse(text)
+          gridWidgetRoot.glyphList = res.glyphs || []
+          gridWidgetRoot.glyphStatus = res.status === "ok" ? "ok" : "error"
+        } catch (e) {
+          gridWidgetRoot.glyphStatus = "error"
+        }
+      }
+    }
+  }
+
   function setHeaderSetting(key, val) {
     gridWidgetRoot[key] = val
     gridWidgetRoot.saveSetting(key, val)
@@ -89,7 +146,12 @@ WidgetCard {
     // The app picker has its own claim on the keyboard.
     if (!gridWidgetRoot.pickerOpen && rootRef && rootRef.keyboardFocusRequested) rootRef.keyboardFocusRequested = false
   }
-  onContextMenuOpenChanged: if (!contextMenuOpen) releaseKeyboard()
+  onContextMenuOpenChanged: {
+    if (contextMenuOpen) return
+    releaseKeyboard()
+    glyphPickerOpen = false
+    glyphQuery = ""
+  }
 
   function applySavedSettings() {
     themeColors = getSetting("themeColors", true)
@@ -377,15 +439,225 @@ WidgetCard {
         onHideToggled: gridWidgetRoot.setHeaderSetting("titleHidden", !gridWidgetRoot.titleHidden)
       }
 
-      HeaderField {
-        host: gridWidgetRoot
-        label: "Glyph"
-        value: gridWidgetRoot.glyphText
-        placeholder: gridWidgetRoot.defaultGlyph + "  (paste a Nerd Font glyph)"
-        hidden: gridWidgetRoot.glyphHidden
-        maxLength: 4
-        onEdited: function(text) { gridWidgetRoot.setHeaderSetting("glyphText", text) }
-        onHideToggled: gridWidgetRoot.setHeaderSetting("glyphHidden", !gridWidgetRoot.glyphHidden)
+      // Glyph: a dropdown of every icon glyph in the system font.
+      RowLayout {
+        Layout.fillWidth: true
+        Layout.leftMargin: 4
+        Layout.rightMargin: 4
+        spacing: Style.space(6)
+
+        Text {
+          Layout.preferredWidth: 38
+          text: "Glyph"
+          font.family: Style.font.family
+          font.pixelSize: 10
+          color: Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.7)
+        }
+
+        Rectangle {
+          Layout.fillWidth: true
+          implicitHeight: 26
+          radius: 6
+          color: glyphButtonMouse.containsMouse ? Qt.rgba(1, 1, 1, 0.1) : Qt.rgba(1, 1, 1, 0.07)
+          border.color: gridWidgetRoot.glyphPickerOpen ? Color.accent : Qt.rgba(1, 1, 1, 0.12)
+          border.width: 1
+          opacity: gridWidgetRoot.glyphHidden ? 0.45 : 1
+
+          RowLayout {
+            anchors.fill: parent
+            anchors.leftMargin: Style.space(8)
+            anchors.rightMargin: Style.space(8)
+            spacing: Style.space(8)
+
+            Text {
+              text: gridWidgetRoot.shownGlyph
+              font.family: Style.font.family
+              font.pixelSize: 14
+              color: Color.accent
+            }
+            Text {
+              Layout.fillWidth: true
+              text: gridWidgetRoot.glyphHidden ? "(hidden)" : gridWidgetRoot.shownGlyphName
+              elide: Text.ElideRight
+              font.family: Style.font.family
+              font.pixelSize: 10
+              color: Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.6)
+            }
+            Text {
+              text: gridWidgetRoot.glyphPickerOpen ? "\uf077" : "\uf078"
+              font.family: Style.font.family
+              font.pixelSize: 9
+              color: Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.55)
+            }
+          }
+
+          MouseArea {
+            id: glyphButtonMouse
+            anchors.fill: parent
+            hoverEnabled: true
+            cursorShape: Qt.PointingHandCursor
+            onClicked: gridWidgetRoot.toggleGlyphPicker()
+          }
+        }
+
+        Rectangle {
+          implicitWidth: 46
+          implicitHeight: 26
+          radius: 6
+          color: gridWidgetRoot.glyphHidden ? Qt.rgba(Color.accent.r, Color.accent.g, Color.accent.b, 0.3) : (glyphHideMouse.containsMouse ? Qt.rgba(1, 1, 1, 0.1) : Qt.rgba(1, 1, 1, 0.05))
+          border.color: gridWidgetRoot.glyphHidden ? Color.accent : "transparent"
+          border.width: 1
+
+          Text {
+            anchors.centerIn: parent
+            text: "Hide"
+            font.family: Style.font.family
+            font.pixelSize: 10
+            font.weight: gridWidgetRoot.glyphHidden ? Font.Bold : Font.Normal
+            color: gridWidgetRoot.glyphHidden ? Color.accent : Color.foreground
+          }
+
+          MouseArea {
+            id: glyphHideMouse
+            anchors.fill: parent
+            hoverEnabled: true
+            cursorShape: Qt.PointingHandCursor
+            onClicked: gridWidgetRoot.setHeaderSetting("glyphHidden", !gridWidgetRoot.glyphHidden)
+          }
+        }
+      }
+
+      // The dropdown itself: search + a scrolling grid of glyphs.
+      ColumnLayout {
+        visible: gridWidgetRoot.glyphPickerOpen
+        Layout.fillWidth: true
+        Layout.leftMargin: 4
+        Layout.rightMargin: 4
+        spacing: Style.space(4)
+
+        Rectangle {
+          Layout.fillWidth: true
+          implicitHeight: 26
+          radius: 6
+          color: Qt.rgba(1, 1, 1, 0.07)
+          border.color: glyphSearch.activeFocus ? Color.accent : Qt.rgba(1, 1, 1, 0.12)
+          border.width: 1
+
+          TextInput {
+            id: glyphSearch
+            anchors.fill: parent
+            anchors.leftMargin: Style.space(8)
+            anchors.rightMargin: Style.space(8)
+            verticalAlignment: TextInput.AlignVCenter
+            font.family: Style.font.family
+            font.pixelSize: 11
+            color: Color.foreground
+            selectionColor: Qt.rgba(Color.accent.r, Color.accent.g, Color.accent.b, 0.4)
+            clip: true
+            text: gridWidgetRoot.glyphQuery
+            onTextEdited: gridWidgetRoot.glyphQuery = text
+
+            Text {
+              anchors.fill: parent
+              verticalAlignment: Text.AlignVCenter
+              visible: !glyphSearch.text && !glyphSearch.activeFocus
+              text: gridWidgetRoot.glyphStatus === "ok"
+                ? "Search " + gridWidgetRoot.glyphList.length + " glyphs (rocket, home, fa-...)"
+                : (gridWidgetRoot.glyphStatus === "error" ? "Couldn't read the font's glyphs" : "Loading glyphs...")
+              font.family: Style.font.family
+              font.pixelSize: 11
+              color: Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.35)
+              elide: Text.ElideRight
+            }
+
+            MouseArea {
+              anchors.fill: parent
+              cursorShape: Qt.IBeamCursor
+              onPressed: function(mouse) {
+                gridWidgetRoot.grabKeyboard(glyphSearch)
+                mouse.accepted = false
+              }
+            }
+          }
+        }
+
+        GridView {
+          id: glyphGrid
+          Layout.fillWidth: true
+          Layout.preferredHeight: 6 * cellHeight
+          clip: true
+          boundsBehavior: Flickable.StopAtBounds
+          cellWidth: Math.floor(width / 8)
+          cellHeight: 34
+          model: gridWidgetRoot.filteredGlyphs
+
+          delegate: Rectangle {
+            required property var modelData
+            readonly property bool current: modelData[0] === gridWidgetRoot.shownGlyphCode && !gridWidgetRoot.glyphHidden
+            width: glyphGrid.cellWidth - 2
+            height: glyphGrid.cellHeight - 2
+            radius: 6
+            color: current ? Qt.rgba(Color.accent.r, Color.accent.g, Color.accent.b, 0.3)
+              : (cellMouse.containsMouse ? Qt.rgba(1, 1, 1, 0.1) : "transparent")
+            border.color: current ? Color.accent : "transparent"
+            border.width: 1
+
+            Text {
+              anchors.centerIn: parent
+              text: String.fromCodePoint(modelData[0])
+              font.family: Style.font.family
+              font.pixelSize: 16
+              color: parent.current ? Color.accent : Color.foreground
+            }
+
+            MouseArea {
+              id: cellMouse
+              anchors.fill: parent
+              hoverEnabled: true
+              cursorShape: Qt.PointingHandCursor
+              onContainsMouseChanged: if (containsMouse) gridWidgetRoot.glyphHoverName = modelData[1]
+              onClicked: gridWidgetRoot.pickGlyph(modelData[0])
+            }
+          }
+        }
+
+        RowLayout {
+          Layout.fillWidth: true
+          spacing: Style.space(6)
+
+          Text {
+            Layout.fillWidth: true
+            text: gridWidgetRoot.glyphHoverName || (gridWidgetRoot.glyphStatus === "ok" ? gridWidgetRoot.filteredGlyphs.length + " shown" : "")
+            elide: Text.ElideRight
+            font.family: Style.font.family
+            font.pixelSize: 9
+            color: Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.55)
+          }
+
+          Rectangle {
+            implicitWidth: defaultText.implicitWidth + 16
+            implicitHeight: 22
+            radius: 6
+            color: defaultMouse.containsMouse ? Qt.rgba(1, 1, 1, 0.1) : Qt.rgba(1, 1, 1, 0.05)
+
+            Text {
+              id: defaultText
+              anchors.centerIn: parent
+              text: "Default " + gridWidgetRoot.defaultGlyph
+              font.family: Style.font.family
+              font.pixelSize: 10
+              color: Color.foreground
+            }
+
+            MouseArea {
+              id: defaultMouse
+              anchors.fill: parent
+              hoverEnabled: true
+              cursorShape: Qt.PointingHandCursor
+              onClicked: gridWidgetRoot.pickGlyph(0)
+            }
+          }
+        }
       }
 
       Text {
