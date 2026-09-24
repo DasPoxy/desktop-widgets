@@ -23,7 +23,8 @@ Note: Not a finalized list I add new widgets/tweak existing widgets as I tryout 
 
 Files are laid out the way upstream lays out its own newer widgets
 (`git-activity/`, `pomodoro/`, `rss-feed/`…): each widget has its own
-`widgets/<widget>/` folder holding its QML and the scripts it runs. Pieces
+`widgets/<widget>/` folder holding its QML, the scripts it runs, and a
+`README.md` describing it. Pieces
 several widgets use live beside upstream's `WidgetCard.qml` in `shared/`
 (`SuiteUpdateItem.qml`, `HeaderEditor.qml`, `ThemePalette.qml`,
 `GridLines.qml`), `get-glyphs.sh` sits in the plugin root with upstream's other
