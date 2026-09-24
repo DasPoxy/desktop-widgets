@@ -6,6 +6,8 @@ Backup of the custom widgets built on top of
 folder, `~/.config/omarchy/plugins/dagyr.desktop-widgets/`. This repo is an
 overlay: only the files that are new or changed relative to upstream.
 
+Note: Not a finalized list I add new widgets/tweak existing widgets as I tryout new settings and features.
+
 ## Widgets
 
 | Widget | File | What it does |
