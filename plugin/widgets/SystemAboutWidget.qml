@@ -45,9 +45,44 @@ WidgetCard {
     aboutWidgetRoot.saveSetting(key, aboutWidgetRoot[key])
   }
 
+  // Grid Mode: the header divider carries on down the middle and between
+  // the rows and sections, like a table. Line positions are measured from
+  // the laid-out cells (updateGridLines), so they follow resizes and data.
+  property bool gridMode: false
+  property var gridLineYs: []
+  property real gridLineX: 0
+
   function applySavedSettings() {
     pollIntervalMs = getSetting("pollIntervalMs", 30000)
     themeColors = getSetting("themeColors", true)
+    gridMode = getSetting("gridMode", false)
+  }
+
+  onGridModeChanged: gridLinesTimer.restart()
+  onInfoChanged: gridLinesTimer.restart()
+  Timer {
+    id: gridLinesTimer
+    interval: 30
+    onTriggered: aboutWidgetRoot.updateGridLines()
+  }
+  function updateGridLines() {
+    if (!gridMode) return
+    var ys = [], first = true, x = 0
+    var secs = [[hardwareSection, hardwareGrid], [softwareSection, softwareGrid], [uptimeSection, uptimeGrid]]
+    for (var k = 0; k < secs.length; k++) {
+      var sec = secs[k][0], grid = secs[k][1]
+      if (!sec.visible) continue
+      if (!first) ys.push(sec.y - aboutColumn.spacing / 2)
+      first = false
+      var cells = []
+      for (var c = 0; c < grid.children.length; c++)
+        if (grid.children[c].modelData !== undefined && grid.children[c].visible) cells.push(grid.children[c])
+      if (!x && cells.length > 1) x = grid.x + (cells[0].x + cells[0].width + cells[1].x) / 2
+      for (var i = 2; i < cells.length; i += 2)
+        ys.push(sec.y + grid.y + (cells[i - 2].y + cells[i - 2].height + cells[i].y) / 2)
+    }
+    gridLineYs = ys
+    gridLineX = x || aboutColumn.width / 2
   }
 
   onSettingsLoaded: applySavedSettings()
@@ -140,6 +175,8 @@ WidgetCard {
       // Section hue, from the enclosing GridLayout (see sectionHue below).
       readonly property color hue: parent && parent.sectionHue !== undefined ? parent.sectionHue : Color.accent
       Layout.fillWidth: true
+      // Grid Mode: equal columns, so the middle line runs straight down.
+      Layout.preferredWidth: aboutWidgetRoot.gridMode ? 1 : -1
       spacing: 0
 
       RowLayout {
@@ -262,6 +299,50 @@ WidgetCard {
           hoverEnabled: true
           cursorShape: Qt.PointingHandCursor
           onClicked: aboutWidgetRoot.toggleSetting("themeColors")
+        }
+      }
+      // Grid Mode toggle
+      Rectangle {
+        Layout.fillWidth: true
+        implicitHeight: 28
+        radius: 6
+        color: gridModeMouse.containsMouse ? Qt.rgba(Color.accent.r, Color.accent.g, Color.accent.b, 0.2) : "transparent"
+
+        RowLayout {
+          anchors.fill: parent
+          anchors.leftMargin: Style.space(8)
+          anchors.rightMargin: Style.space(8)
+          spacing: Style.space(8)
+
+          Text {
+            text: String.fromCodePoint(0xf02c1) // md-grid
+            font.family: Style.font.family
+            font.pixelSize: 11
+            color: aboutWidgetRoot.gridMode ? Color.accent : Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.5)
+          }
+
+          Text {
+            Layout.fillWidth: true
+            text: "Grid Mode"
+            font.family: Style.font.family
+            font.pixelSize: 11
+            color: Color.foreground
+          }
+
+          Text {
+            text: aboutWidgetRoot.gridMode ? "\uf14a" : "\uf096"
+            font.family: Style.font.family
+            font.pixelSize: 12
+            color: aboutWidgetRoot.gridMode ? Color.accent : Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.4)
+          }
+        }
+
+        MouseArea {
+          id: gridModeMouse
+          anchors.fill: parent
+          hoverEnabled: true
+          cursorShape: Qt.PointingHandCursor
+          onClicked: aboutWidgetRoot.toggleSetting("gridMode")
         }
       }
       // Update the whole custom widget suite from its repo.
@@ -442,19 +523,37 @@ WidgetCard {
       id: aboutFlick
       Layout.fillWidth: true
       Layout.fillHeight: true
+      // Grid Mode: reach up into the layout gap (topMargin puts the content
+      // back) so the middle line meets the header divider.
+      Layout.topMargin: aboutWidgetRoot.gridMode ? -aboutCardLayout.spacing : 0
+      topMargin: aboutWidgetRoot.gridMode ? aboutCardLayout.spacing : 0
       visible: aboutWidgetRoot.hasData
       clip: true
       contentWidth: width
       contentHeight: aboutColumn.implicitHeight
       boundsBehavior: Flickable.StopAtBounds
 
+      GridLines {
+        visible: aboutWidgetRoot.gridMode
+        xs: [aboutWidgetRoot.gridLineX]
+        ys: aboutWidgetRoot.gridLineYs
+        vTop: -aboutFlick.topMargin
+        vBottom: aboutColumn.implicitHeight
+        hLeft: 0
+        hRight: aboutColumn.width
+        color: pal.line
+      }
+
       ColumnLayout {
         id: aboutColumn
         width: aboutFlick.width
         spacing: Style.space(10)
+        onImplicitHeightChanged: gridLinesTimer.restart()
+        onWidthChanged: gridLinesTimer.restart()
 
         // Hardware Section
         ColumnLayout {
+          id: hardwareSection
           Layout.fillWidth: true
           spacing: Style.space(3)
           visible: aboutWidgetRoot.hardwareRows.length > 0
@@ -468,6 +567,7 @@ WidgetCard {
           }
 
           GridLayout {
+            id: hardwareGrid
             readonly property color sectionHue: pal.tertiary
             Layout.fillWidth: true
             columns: 2
@@ -483,6 +583,7 @@ WidgetCard {
 
         // Software Section
         ColumnLayout {
+          id: softwareSection
           Layout.fillWidth: true
           spacing: Style.space(3)
           visible: aboutWidgetRoot.softwareRows.length > 0
@@ -496,6 +597,7 @@ WidgetCard {
           }
 
           GridLayout {
+            id: softwareGrid
             readonly property color sectionHue: pal.secondary
             Layout.fillWidth: true
             columns: 2
@@ -511,6 +613,7 @@ WidgetCard {
 
         // Uptime Section
         ColumnLayout {
+          id: uptimeSection
           Layout.fillWidth: true
           spacing: Style.space(3)
           visible: aboutWidgetRoot.uptimeRows.length > 0
@@ -524,6 +627,7 @@ WidgetCard {
           }
 
           GridLayout {
+            id: uptimeGrid
             readonly property color sectionHue: pal.live
             Layout.fillWidth: true
             columns: 2

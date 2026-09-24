@@ -94,8 +94,13 @@ WidgetCard {
     releaseKeyboard()
   }
 
+  // Grid Mode: the header divider carries on down between the tiles as grid
+  // lines, and the tiles drop their own backgrounds.
+  property bool gridMode: false
+
   function applySavedSettings() {
     themeColors = getSetting("themeColors", true)
+    gridMode = getSetting("gridMode", false)
     titleText = getSetting("titleText", "")
     glyphText = getSetting("glyphText", "")
     titleHidden = getSetting("titleHidden", false)
@@ -398,6 +403,51 @@ WidgetCard {
         }
       }
 
+      // Grid Mode toggle
+      Rectangle {
+        Layout.fillWidth: true
+        implicitHeight: 28
+        radius: 6
+        color: gridModeMouse.containsMouse ? Qt.rgba(Color.accent.r, Color.accent.g, Color.accent.b, 0.2) : "transparent"
+
+        RowLayout {
+          anchors.fill: parent
+          anchors.leftMargin: Style.space(8)
+          anchors.rightMargin: Style.space(8)
+          spacing: Style.space(8)
+
+          Text {
+            text: String.fromCodePoint(0xf02c1) // md-grid
+            font.family: Style.font.family
+            font.pixelSize: 11
+            color: gridWidgetRoot.gridMode ? Color.accent : Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.5)
+          }
+
+          Text {
+            Layout.fillWidth: true
+            text: "Grid Mode"
+            font.family: Style.font.family
+            font.pixelSize: 11
+            color: Color.foreground
+          }
+
+          Text {
+            text: gridWidgetRoot.gridMode ? "\uf14a" : "\uf096"
+            font.family: Style.font.family
+            font.pixelSize: 12
+            color: gridWidgetRoot.gridMode ? Color.accent : Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.4)
+          }
+        }
+
+        MouseArea {
+          id: gridModeMouse
+          anchors.fill: parent
+          hoverEnabled: true
+          cursorShape: Qt.PointingHandCursor
+          onClicked: gridWidgetRoot.toggleSetting("gridMode")
+        }
+      }
+
       Text {
         Layout.fillWidth: true
         Layout.topMargin: 2
@@ -574,6 +624,9 @@ WidgetCard {
     ColumnLayout {
       Layout.fillWidth: true
       Layout.fillHeight: true
+      // Grid Mode: reach up into the layout gap (topMargin below puts the
+      // tiles back) so the vertical lines meet the header divider.
+      Layout.topMargin: gridWidgetRoot.gridMode ? -gridCardLayout.spacing : 0
       visible: !gridWidgetRoot.pickerOpen
       spacing: Style.space(6)
 
@@ -581,6 +634,7 @@ WidgetCard {
         id: appGridView
         Layout.fillWidth: true
         Layout.fillHeight: true
+        topMargin: gridWidgetRoot.gridMode ? gridCardLayout.spacing : 0
         clip: true
         boundsBehavior: Flickable.StopAtBounds
         interactive: contentHeight > height
@@ -589,6 +643,20 @@ WidgetCard {
         cellHeight: cellWidth
 
         model: gridWidgetRoot.currentPageItems
+
+        // One full page of cells (gridCols x gridCols), filled or not.
+        GridLines {
+          visible: gridWidgetRoot.gridMode
+          z: -1
+          readonly property int n: gridWidgetRoot.gridCols
+          xs: { var a = []; for (var i = 1; i < n; i++) a.push(i * appGridView.cellWidth); return a }
+          ys: { var a = []; for (var i = 1; i < n; i++) a.push(i * appGridView.cellHeight); return a }
+          vTop: -appGridView.topMargin
+          vBottom: n * appGridView.cellHeight
+          hLeft: 0
+          hRight: n * appGridView.cellWidth
+          color: pal.line
+        }
 
         delegate: Item {
           id: tileRoot
@@ -603,8 +671,8 @@ WidgetCard {
             anchors.margins: 3
             radius: 12
             color: modelData.__add
-              ? (addTileMouse.containsMouse ? pal.tint(tileRoot.hue, 0.18) : Qt.rgba(1, 1, 1, 0.03))
-              : (tileMouse.containsMouse ? (gridWidgetRoot.themeColors ? pal.tint(tileRoot.hue, 0.16) : Qt.rgba(1, 1, 1, 0.12)) : Qt.rgba(1, 1, 1, 0.03))
+              ? (addTileMouse.containsMouse ? pal.tint(tileRoot.hue, 0.18) : (gridWidgetRoot.gridMode ? "transparent" : Qt.rgba(1, 1, 1, 0.03)))
+              : (tileMouse.containsMouse ? (gridWidgetRoot.themeColors ? pal.tint(tileRoot.hue, 0.16) : Qt.rgba(1, 1, 1, 0.12)) : (gridWidgetRoot.gridMode ? "transparent" : Qt.rgba(1, 1, 1, 0.03)))
             border.color: modelData.__add ? pal.tint(tileRoot.hue, 0.4)
               : (gridWidgetRoot.themeColors && tileMouse.containsMouse ? pal.tint(tileRoot.hue, 0.45) : "transparent")
             border.width: modelData.__add || (gridWidgetRoot.themeColors && tileMouse.containsMouse) ? 1 : 0
