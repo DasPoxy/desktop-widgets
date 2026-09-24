@@ -57,6 +57,7 @@ WidgetCard {
     eyeStyle = getSetting("eyeStyle", "classic")
     examineClicks = getSetting("examineClicks", true)
     irisStyle = getSetting("irisStyle", "auto")
+    themeColors = getSetting("themeColors", true)
     openSections = getSetting("openSections", {})
     chaseFastMouse = getSetting("chaseFastMouse", true)
   }
@@ -162,9 +163,16 @@ WidgetCard {
   // ---------------------------------------------------------------------------
   // 🎨 Themes -- "system" follows the Omarchy theme; the rest are fixed.
   // ---------------------------------------------------------------------------
+  // Full Theme Palette (Eye Theme section): the System Theme draws on all of
+  // the theme's hues -- secondary tints the iris shadow and ink, tertiary the
+  // cel shadows and print offset, highlight the iris crescent. Off: every
+  // role falls back to the accent (ThemePalette's inactive mode), same as
+  // the other widgets' toggle.
+  property bool themeColors: true
+
   ThemePalette {
     id: pal
-    active: true
+    active: warden.themeColors
   }
 
   // Flat riso-print palettes: sclera = paper, scleraShade = the cel shadow
@@ -174,9 +182,9 @@ WidgetCard {
     id: "system", name: "System Theme",
     sclera: String(Qt.tint("#f3ead9", Qt.alpha(pal.secondary, 0.05))),
     scleraShade: String(Qt.tint("#aebccb", Qt.alpha(pal.tertiary, 0.35))),
-    irisDark: String(Qt.darker(Color.accent, 2.4)),
+    irisDark: String(pal.mixColor(Qt.darker(Color.accent, 2.4), Qt.darker(pal.secondary, 2.2), 0.4)),
     iris: String(Color.accent),
-    irisLight: String(pal.mixColor(Qt.lighter(Color.accent, 1.5), pal.highlight, 0.3)),
+    irisLight: String(pal.mixColor(Qt.lighter(Color.accent, 1.5), pal.highlight, 0.45)),
     pupil: String(Qt.tint("#16152b", Qt.alpha(pal.secondary, 0.2))),
     highlight: "#fff7ea",
     lash: String(Qt.tint("#16152b", Qt.alpha(pal.secondary, 0.25))),
@@ -1453,6 +1461,31 @@ WidgetCard {
         value: warden.theme.name
         open: !!warden.openSections.theme
         onToggled: warden.toggleSection("theme")
+      }
+
+      // Full Theme Palette -- shapes the System Theme, so turning it either
+      // way while a preset is picked switches to the System Theme.
+      MenuToggle {
+        visible: !!warden.openSections.theme
+        glyph: String.fromCodePoint(0xf03d8) // md-palette
+        label: "Full Theme Palette"
+        checked: warden.themeColors
+        onToggled: {
+          warden.toggleSetting("themeColors")
+          if (warden.themeId !== "system") warden.setTheme("system")
+        }
+      }
+      Text {
+        visible: !!warden.openSections.theme
+        Layout.fillWidth: true
+        Layout.leftMargin: Style.space(8)
+        Layout.rightMargin: Style.space(8)
+        Layout.bottomMargin: Style.space(2)
+        wrapMode: Text.WordWrap
+        text: warden.themeColors ? "System Theme uses every hue in your Omarchy theme." : "System Theme uses your accent colour only."
+        font.family: Style.font.family
+        font.pixelSize: 9
+        color: Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.45)
       }
 
       GridLayout {
