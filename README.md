@@ -43,6 +43,7 @@ The big clock behind Abyss Warden in [these shots](#abyss-warden).
 
 <p>
   <img src="screenshots/karaoke-player/playing.png" width="380" alt="Karaoke Player with synced lyrics">
+  <img src="screenshots/karaoke-player/options.png" width="380" alt="Karaoke Player options">
 </p>
 
 ### Video Player
