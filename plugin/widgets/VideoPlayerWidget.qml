@@ -700,6 +700,8 @@ WidgetCard {
           Layout.preferredWidth: 34
         }
       }
+      // Update the whole custom widget suite from its repo.
+      SuiteUpdateItem {}
     }
   }
 

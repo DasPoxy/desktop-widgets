@@ -26,6 +26,10 @@ Edits to upstream files (in `patches/upstream-edits.patch`, full copies in
 - `widgets/quick-notes/QuickNotesWidget.qml` reloads live when `notes.json`
   changes on disk.
 
+## Updating
+
+Every custom widget's right-click menu ends with **Check for Updates**. It compares the installed version with this repo; if there's something new it lists the commits and a second click installs the whole suite (same as re-running the one-line installer: `install.sh` backs up anything it replaces) and reloads the shell.
+
 ## Install / restore
 
 ### One-line install

@@ -534,6 +534,8 @@ WidgetCard {
         font.pixelSize: 9
         color: Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.45)
       }
+      // Update the whole custom widget suite from its repo.
+      SuiteUpdateItem {}
     }
   }
 

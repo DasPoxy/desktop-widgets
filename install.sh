@@ -68,6 +68,13 @@ else
 fi
 
 chmod +x "$PLUGIN"/get-*.sh 2>/dev/null || true
+
+# Record what's installed, for the widgets' "Check for Updates" menu item.
+VERSION_FILE="${XDG_STATE_HOME:-$HOME/.local/state}/omarchy/desktop-widgets-version"
+if sha=$(git -C "$REPO" rev-parse HEAD 2>/dev/null); then
+  mkdir -p "$(dirname "$VERSION_FILE")"
+  echo "$sha" > "$VERSION_FILE"
+fi
 (( backed_up )) && echo "replaced files backed up to $BACKUP"
 echo
 echo "Done. Reload the shell to pick it up:"

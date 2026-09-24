@@ -384,6 +384,8 @@ WidgetCard {
           onClicked: monWidgetRoot.toggleSetting("themeColors")
         }
       }
+      // Update the whole custom widget suite from its repo.
+      SuiteUpdateItem {}
     }
   }
 
