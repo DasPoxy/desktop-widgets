@@ -35,7 +35,7 @@ Every custom widget's right-click menu ends with **Check for Updates**. It compa
 ### One-line install
 
 ```sh
-bash <(curl -fsSL https://raw.githubusercontent.com/DasPoxy/desktop-widgets/main/bootstrap.sh)
+bash <(curl -fsSL https://raw.githubusercontent.com/DasPoxy/omarchy-desktop-widgets-daspoxy-collection/main/bootstrap.sh)
 ```
 
 This checks that [dagyr.desktop-widgets](https://github.com/cyelis1224/omarchy-desktop-widgets)
@@ -55,7 +55,7 @@ Re-run the same line to update.
    these were built on.
 2. Clone this repo and run the installer:
    ```sh
-   git clone https://github.com/DasPoxy/desktop-widgets.git
+   git clone https://github.com/DasPoxy/omarchy-desktop-widgets-daspoxy-collection.git
    cd desktop-widgets && ./install.sh
    ```
    It copies the new files in. For the two edited upstream

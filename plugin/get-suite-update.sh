@@ -23,7 +23,7 @@ import shutil
 import subprocess
 import urllib.request
 
-REPO_URL = os.environ.get('DESKTOP_WIDGETS_REPO', 'https://github.com/DasPoxy/desktop-widgets.git')
+REPO_URL = os.environ.get('DESKTOP_WIDGETS_REPO', 'https://github.com/DasPoxy/omarchy-desktop-widgets-daspoxy-collection.git')
 BRANCH = 'main'
 STATE = os.path.join(os.environ.get('XDG_STATE_HOME') or os.path.expanduser('~/.local/state'),
                      'omarchy', 'desktop-widgets-version')
@@ -91,6 +91,8 @@ def apply():
         raise RuntimeError('dagyr.desktop-widgets plugin not found at ' + PLUGIN)
     local = installed()
     if os.path.isdir(os.path.join(DEST, '.git')):
+        # Follows the repo if it's been renamed/moved since this clone.
+        git('remote', 'set-url', 'origin', REPO_URL, cwd=DEST)
         git('fetch', '--quiet', 'origin', BRANCH, cwd=DEST)
         git('reset', '--hard', '--quiet', 'origin/' + BRANCH, cwd=DEST)
     else:

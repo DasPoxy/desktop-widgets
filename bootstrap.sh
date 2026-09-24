@@ -2,11 +2,11 @@
 # One-line installer: checks that dagyr.desktop-widgets is installed, fetches
 # (or updates) this repo, then runs install.sh from it.
 #
-#   bash <(curl -fsSL https://raw.githubusercontent.com/DasPoxy/desktop-widgets/main/bootstrap.sh)
+#   bash <(curl -fsSL https://raw.githubusercontent.com/DasPoxy/omarchy-desktop-widgets-daspoxy-collection/main/bootstrap.sh)
 set -euo pipefail
 
 UPSTREAM_URL="https://github.com/cyelis1224/omarchy-desktop-widgets"
-REPO_URL="${DESKTOP_WIDGETS_REPO:-https://github.com/DasPoxy/desktop-widgets.git}"
+REPO_URL="${DESKTOP_WIDGETS_REPO:-https://github.com/DasPoxy/omarchy-desktop-widgets-daspoxy-collection.git}"
 PLUGIN="${PLUGIN_DIR:-$HOME/.config/omarchy/plugins/dagyr.desktop-widgets}"
 DEST="${DESKTOP_WIDGETS_DIR:-${XDG_DATA_HOME:-$HOME/.local/share}/desktop-widgets}"
 
