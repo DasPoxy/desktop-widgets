@@ -57,6 +57,48 @@ WidgetCard {
     return w.length > 6 ? w.slice(0, 6) : w
   }
 
+  // Session reset countdown next to the AGENTS heading: the soonest
+  // session-window reset across agents, ticking locally between the
+  // once-a-minute refreshes (resetsInSec is relative to the fetch).
+  property real agentsFetchedAt: 0
+  property real nowMs: Date.now()
+  readonly property var sessionLimit: {
+    var best = null
+    for (var a = 0; a < agents.length; a++) {
+      var limits = agents[a].limits || []
+      for (var i = 0; i < limits.length; i++) {
+        var l = limits[i]
+        if (!/session|5[- ]?hour/i.test(l.label || "") || l.resetsInSec === undefined) continue
+        if (!best || l.resetsInSec < best.resetsInSec) best = l
+      }
+    }
+    return best
+  }
+  // Length of the session window, from its label ("Session (5-hour)").
+  readonly property int sessionWindowSec: {
+    var m = /(\d+)[- ]?hour/i.exec(sessionLimit ? sessionLimit.label : "")
+    return (m ? parseInt(m[1]) : 5) * 3600
+  }
+  readonly property int sessionLeftSec: sessionLimit && agentsFetchedAt > 0
+    ? Math.max(0, Math.round(sessionLimit.resetsInSec - (nowMs - agentsFetchedAt) / 1000)) : -1
+  readonly property bool sessionCountdownShown: agentsVisible && sessionLeftSec >= 0
+
+  Timer {
+    interval: 1000
+    running: monWidgetRoot.sessionCountdownShown
+    repeat: true
+    onTriggered: monWidgetRoot.nowMs = Date.now()
+  }
+  // Fetch fresh numbers once the window has rolled over.
+  onSessionLeftSecChanged: if (sessionLeftSec === 0) Qt.callLater(refreshAgents)
+
+  function formatCountdown(sec) {
+    if (sec <= 0) return "now"
+    var h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60), s = sec % 60
+    function two(n) { return n < 10 ? "0" + n : "" + n }
+    return h > 0 ? h + "h " + two(m) + "m" : m + "m " + two(s) + "s"
+  }
+
   function formatResetIn(sec) {
     if (sec < 0) return ""
     var d = Math.floor(sec / 86400)
@@ -83,6 +125,7 @@ WidgetCard {
         try {
           var data = JSON.parse(str)
           monWidgetRoot.agents = Array.isArray(data.agents) ? data.agents : []
+          monWidgetRoot.agentsFetchedAt = Date.now()
         } catch (e) {
           console.warn("[SystemMonitorWidget] agents parse error:", e)
         }
@@ -151,6 +194,7 @@ WidgetCard {
     glyphHidden = getSetting("glyphHidden", false)
     pollIntervalMs = getSetting("pollIntervalMs", 2000)
     showAgents = getSetting("showAgents", true)
+    netGraph = getSetting("netGraph", false)
     themeColors = getSetting("themeColors", true)
   }
 
@@ -192,6 +236,7 @@ WidgetCard {
           monWidgetRoot.ram = data.ram || null
           monWidgetRoot.gpus = Array.isArray(data.gpus) ? data.gpus : []
           monWidgetRoot.network = data.network || null
+          monWidgetRoot.pushNetSample(monWidgetRoot.network)
         } catch (e) {
           console.warn("[SystemMonitorWidget] parse error:", e)
         }
@@ -204,6 +249,25 @@ WidgetCard {
     running: true
     repeat: true
     onTriggered: if (!sysmonProc.running) sysmonProc.running = true
+  }
+
+  // Network Graph: the last netHistoryLen polls of down/up rate, drawn as
+  // a live area graph under the readings (menu toggle).
+  property bool netGraph: false
+  readonly property int netHistoryLen: 60
+  property var netDownHist: []
+  property var netUpHist: []
+  function pushNetSample(net) {
+    if (!net) return
+    var d = netDownHist.concat([net.down_rate_bps || 0]), u = netUpHist.concat([net.up_rate_bps || 0])
+    if (d.length > netHistoryLen) { d = d.slice(d.length - netHistoryLen); u = u.slice(u.length - netHistoryLen) }
+    netDownHist = d
+    netUpHist = u
+  }
+  function formatRate(bps) {
+    var units = ["B/s", "KB/s", "MB/s", "GB/s"], i = 0
+    while (bps >= 1024 && i < units.length - 1) { bps /= 1024; i++ }
+    return (bps >= 100 || i === 0 ? Math.round(bps) : bps.toFixed(1)) + " " + units[i]
   }
 
   function resetSession() {
@@ -330,6 +394,51 @@ WidgetCard {
             monWidgetRoot.resetSession()
             monWidgetRoot.contextMenuOpen = false
           }
+        }
+      }
+
+      // Network graph toggle
+      Rectangle {
+        Layout.fillWidth: true
+        implicitHeight: 28
+        radius: 6
+        color: netGraphToggleMouse.containsMouse ? Qt.rgba(Color.accent.r, Color.accent.g, Color.accent.b, 0.2) : "transparent"
+
+        RowLayout {
+          anchors.fill: parent
+          anchors.leftMargin: Style.space(8)
+          anchors.rightMargin: Style.space(8)
+          spacing: Style.space(8)
+
+          Text {
+            text: String.fromCodePoint(0xf0127) // md-chart_areaspline
+            font.family: Style.font.family
+            font.pixelSize: 11
+            color: monWidgetRoot.netGraph ? Color.accent : Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.5)
+          }
+
+          Text {
+            Layout.fillWidth: true
+            text: "Network Graph"
+            font.family: Style.font.family
+            font.pixelSize: 11
+            color: Color.foreground
+          }
+
+          Text {
+            text: monWidgetRoot.netGraph ? "\uf14a" : "\uf096"
+            font.family: Style.font.family
+            font.pixelSize: 12
+            color: monWidgetRoot.netGraph ? Color.accent : Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.4)
+          }
+        }
+
+        MouseArea {
+          id: netGraphToggleMouse
+          anchors.fill: parent
+          hoverEnabled: true
+          cursorShape: Qt.PointingHandCursor
+          onClicked: monWidgetRoot.toggleSetting("netGraph")
         }
       }
 
@@ -834,6 +943,80 @@ WidgetCard {
         Item { Layout.fillWidth: true }
       }
 
+      // Live graph: download as a filled area, upload as a line, scaled to
+      // the busiest sample on screen (shown top-right).
+      Item {
+        visible: monWidgetRoot.netGraph
+        Layout.fillWidth: true
+        implicitHeight: 46
+
+        readonly property color downColor: monWidgetRoot.themeColors ? pal.live : "#10b981"
+        readonly property color upColor: monWidgetRoot.themeColors ? pal.highlight : "#f59e0b"
+        readonly property real peak: Math.max(1024, Math.max.apply(null, monWidgetRoot.netDownHist.concat(monWidgetRoot.netUpHist, [0])))
+
+        Rectangle {
+          anchors.fill: parent
+          radius: 4
+          color: Qt.rgba(1, 1, 1, 0.03)
+          border.color: pal.line
+          border.width: 1
+        }
+
+        Canvas {
+          id: netCanvas
+          anchors.fill: parent
+          anchors.margins: 2
+          readonly property var down: monWidgetRoot.netDownHist
+          readonly property var up: monWidgetRoot.netUpHist
+          onDownChanged: requestPaint()
+          onWidthChanged: requestPaint()
+          onHeightChanged: requestPaint()
+          onPaint: {
+            var ctx = getContext("2d")
+            ctx.reset()
+            var n = monWidgetRoot.netHistoryLen, w = width, h = height, peak = parent.peak
+            function px(i, len) { return w - (len - 1 - i) * (w / (n - 1)) }
+            function py(v) { return h - Math.min(1, v / peak) * (h - 2) - 1 }
+            function trace(vals) {
+              ctx.beginPath()
+              for (var i = 0; i < vals.length; i++) {
+                var x = px(i, vals.length), y = py(vals[i])
+                if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y)
+              }
+            }
+            if (down.length < 2) return
+            var dc = parent.downColor, uc = parent.upColor
+            trace(down)
+            ctx.lineTo(px(down.length - 1, down.length), h)
+            ctx.lineTo(px(0, down.length), h)
+            ctx.closePath()
+            var g = ctx.createLinearGradient(0, 0, 0, h)
+            g.addColorStop(0, Qt.rgba(dc.r, dc.g, dc.b, 0.45))
+            g.addColorStop(1, Qt.rgba(dc.r, dc.g, dc.b, 0.04))
+            ctx.fillStyle = g
+            ctx.fill()
+            trace(down)
+            ctx.strokeStyle = dc
+            ctx.lineWidth = 1.5
+            ctx.stroke()
+            trace(up)
+            ctx.strokeStyle = uc
+            ctx.lineWidth = 1.2
+            ctx.stroke()
+          }
+        }
+
+        Text {
+          anchors.top: parent.top
+          anchors.right: parent.right
+          anchors.margins: 3
+          text: monWidgetRoot.formatRate(parent.peak)
+          font.family: Style.font.family
+          font.pixelSize: 8
+          color: Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.45)
+        }
+      }
+
       RowLayout {
         Layout.fillWidth: true
         spacing: Style.space(6)
@@ -882,12 +1065,12 @@ WidgetCard {
       visible: monWidgetRoot.agentsVisible
       Layout.alignment: Qt.AlignTop
       Layout.fillWidth: monWidgetRoot.network === null
-      Layout.preferredWidth: 90
+      Layout.preferredWidth: monWidgetRoot.sessionCountdownShown ? 104 : 90
       spacing: Style.space(5)
 
       RowLayout {
         Layout.fillWidth: true
-        spacing: Style.space(6)
+        spacing: Style.space(4)
 
         Text {
           text: String.fromCodePoint(0xf06a9) // md-robot
@@ -901,6 +1084,38 @@ WidgetCard {
           font.pixelSize: 9
           font.weight: Font.Bold
           color: Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.45)
+        }
+
+        Item { Layout.fillWidth: true }
+
+        // Session reset spin-down: the ring empties as the window runs out.
+        Canvas {
+          visible: monWidgetRoot.sessionCountdownShown
+          implicitWidth: 9
+          implicitHeight: 9
+          readonly property real frac: Math.max(0, Math.min(1, monWidgetRoot.sessionLeftSec / Math.max(1, monWidgetRoot.sessionWindowSec)))
+          readonly property color ringColor: pal.secondary
+          onFracChanged: requestPaint()
+          onRingColorChanged: requestPaint()
+          onPaint: {
+            var ctx = getContext("2d")
+            ctx.reset()
+            var c = width / 2, r = c - 1.2
+            ctx.lineWidth = 2
+            ctx.strokeStyle = Qt.rgba(1, 1, 1, 0.14)
+            ctx.beginPath(); ctx.arc(c, c, r, 0, Math.PI * 2); ctx.stroke()
+            if (frac <= 0) return
+            ctx.strokeStyle = ringColor
+            ctx.beginPath(); ctx.arc(c, c, r, -Math.PI / 2, -Math.PI / 2 + frac * Math.PI * 2); ctx.stroke()
+          }
+        }
+        Text {
+          visible: monWidgetRoot.sessionCountdownShown
+          text: monWidgetRoot.formatCountdown(monWidgetRoot.sessionLeftSec)
+          font.family: Style.font.family
+          font.pixelSize: 9
+          font.weight: Font.DemiBold
+          color: Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.75)
         }
       }
 
