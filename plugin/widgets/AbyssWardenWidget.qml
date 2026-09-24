@@ -271,6 +271,8 @@ WidgetCard {
 
   property real gazeX: 0
   property real gazeY: 0
+  property real gazeVX: 0
+  property real gazeVY: 0
   property real openness: 0
   property real pupil: 1
   property real pupilTarget: 1
@@ -289,7 +291,7 @@ WidgetCard {
       wakeAnim.stop()
       modeTimer.stop()
       blinkTimer.stop()
-      floatAnim.stop()
+      haltFloat()
       driftTimer.stop()
       rushDelay.stop()
       examineLook.stop()
@@ -493,7 +495,7 @@ WidgetCard {
     var side = (examineX - ox) > floatAreaW / 2 ? -1 : 1
     var cx = examineX + side * (width * 0.5 + 70)
     var cy = examineY - height * 0.45
-    moveEyeTo(cx - ox - width / 2, cy - oy - height / 2, 950, Easing.OutCubic, "examine")
+    moveEyeTo(cx - ox - width / 2, cy - oy - height / 2, 950, "examine")
   }
 
   // --- Rapid mouse movement: stop, look, (floating) hurry over
@@ -529,9 +531,9 @@ WidgetCard {
     modeTimer.stop()
     examineLook.stop()
     if (floating) {
-      floatAnim.stop()
+      stopFloat()           // brake to a stop...
       driftTimer.stop()
-      rushDelay.restart()   // the "stop and look" beat, then hurry over
+      rushDelay.restart()   // ...look for a beat, then hurry over
     }
   }
 
@@ -551,7 +553,7 @@ WidgetCard {
     if (d < stand + 40) return
     var tx = cursorX + dx / d * stand, ty = cursorY + dy / d * stand
     var ox = monitor.x + reserved[0], oy = monitor.y + reserved[1]
-    moveEyeTo(tx - ox - width / 2, ty - oy - height / 2, 1500, Easing.OutQuad, "hurry")
+    moveEyeTo(tx - ox - width / 2, ty - oy - height / 2, 1500, "hurry")
   }
 
   // While the flurry lasts keep up with the cursor; once it has been calm
@@ -632,9 +634,9 @@ WidgetCard {
     var p = scanPts[scanIdx]
     if (scanKind === "bar") {
       var ny = reserved[1] > 0 ? 8 : floatAreaH - height - 8
-      moveEyeTo(p[0] - ox - width / 2, ny, scanIdx === 0 ? 800 : 320, Easing.InOutSine, "scan")
+      moveEyeTo(p[0] - ox - width / 2, ny, scanIdx === 0 ? 800 : 420, "scan")
     } else if (scanIdx === 0) {
-      moveEyeTo(p[0] - ox - width / 2, p[1] - oy + 40, 800, Easing.OutCubic, "scan")
+      moveEyeTo(p[0] - ox - width / 2, p[1] - oy + 40, 800, "scan")
     }
   }
 
@@ -709,13 +711,21 @@ WidgetCard {
     }
     tx += jitterX
     ty += jitterY
-    // Following the mouse is smooth pursuit; everything else is a quick
-    // saccade.
-    // Scanning an edge is a slow, smooth trace.
-    var k = 1 - Math.exp(-dt * (mode === "cursor" ? 9 : (mode === "hurry" ? 18 : (mode === "scan" ? 7 : 22))))
-    gazeX += (tx - gazeX) * k
-    gazeY += (ty - gazeY) * k
+    // Critically damped spring: velocity carries over when the target moves,
+    // so quick looks ease out and in instead of snapping, and the 20Hz cursor
+    // samples blur into one glide. Stiffness per mode: following the mouse
+    // is smooth pursuit, a slow trace when scanning, brisk for glances.
+    var w = mode === "cursor" ? 9 : (mode === "hurry" ? 13 : (mode === "scan" ? 6 : 15))
+    var steps = Math.max(1, Math.ceil(dt / 0.016))
+    var h = dt / steps
+    for (var i = 0; i < steps; i++) {
+      gazeVX += (w * w * (tx - gazeX) - 2 * w * gazeVX) * h
+      gazeVY += (w * w * (ty - gazeY) - 2 * w * gazeVY) * h
+      gazeX += gazeVX * h
+      gazeY += gazeVY * h
+    }
     pupil += (pupilTarget - pupil) * (1 - Math.exp(-dt * 5))
+    if (floating) stepFloat(dt)
   }
 
   FrameAnimation {
@@ -729,8 +739,87 @@ WidgetCard {
   property real floatX: 0
   property real floatY: 0
 
+  // Floating motion is a spring too (see stepFloat): a target, a velocity,
+  // and per-move limits on speed and acceleration, so the eyes ease off,
+  // glide, and settle -- and when the target changes mid-flight (chasing the
+  // mouse, sweeping the bar) they curve toward the new one instead of
+  // restarting from a standstill.
+  property real floatVX: 0
+  property real floatVY: 0
+  property real floatTX: 0
+  property real floatTY: 0
+  property bool floatMoving: false
+  property real floatOmega: 1
+  property real floatMaxSpeed: 250
+  property real floatMaxAccel: 300
+  readonly property var moveProfiles: ({
+    travel: { omega: 1.1, accel: 260 },   // lazy drift
+    scan: { omega: 2.2, accel: 1400 },
+    examine: { omega: 2.6, accel: 2200 },
+    hurry: { omega: 3.6, accel: 3600 },   // rushing over
+    stop: { omega: 4.5, accel: 3000 }     // braking to a halt
+  })
+
+  function stopFloat() {
+    // Coast to a halt rather than freezing mid-air.
+    floatVX = floatVX || 0
+    floatVY = floatVY || 0
+    var maxX = Math.max(0, floatAreaW - width), maxY = Math.max(0, floatAreaH - height)
+    floatTX = Math.max(0, Math.min(maxX, floatX + floatVX * 0.22))
+    floatTY = Math.max(0, Math.min(maxY, floatY + floatVY * 0.22))
+    floatOmega = moveProfiles.stop.omega
+    floatMaxAccel = moveProfiles.stop.accel
+    moveReason = "stop"
+    floatMoving = true
+  }
+
+  function haltFloat() {
+    floatMoving = false
+    floatVX = 0
+    floatVY = 0
+  }
+
+  function stepFloat(dt) {
+    if (!floatMoving) return
+    var maxX = Math.max(0, floatAreaW - width), maxY = Math.max(0, floatAreaH - height)
+    var steps = Math.max(1, Math.ceil(dt / 0.016))
+    var h = dt / steps
+    var w = floatOmega
+    for (var i = 0; i < steps; i++) {
+      var ax = w * w * (floatTX - floatX) - 2 * w * floatVX
+      var ay = w * w * (floatTY - floatY) - 2 * w * floatVY
+      var am = Math.sqrt(ax * ax + ay * ay)
+      if (am > floatMaxAccel) { ax *= floatMaxAccel / am; ay *= floatMaxAccel / am }
+      floatVX += ax * h
+      floatVY += ay * h
+      var vm = Math.sqrt(floatVX * floatVX + floatVY * floatVY)
+      if (vm > floatMaxSpeed) { floatVX *= floatMaxSpeed / vm; floatVY *= floatMaxSpeed / vm }
+      floatX = Math.max(0, Math.min(maxX, floatX + floatVX * h))
+      floatY = Math.max(0, Math.min(maxY, floatY + floatVY * h))
+    }
+    var dx = floatTX - floatX, dy = floatTY - floatY
+    if (dx * dx + dy * dy < 2.25 && floatVX * floatVX + floatVY * floatVY < 64) {
+      floatX = floatTX
+      floatY = floatTY
+      haltFloat()
+      floatArrived()
+    }
+  }
+
+  function floatArrived() {
+    if (!awake) return
+    if (moveReason === "examine" && mode === "examine") {
+      startExamining()
+    } else if (moveReason === "travel") {
+      pickMode()
+      driftTimer.interval = 5000 + Math.random() * 8000
+      driftTimer.restart()
+    }
+    // "hurry"/"scan"/"stop": their own timers decide what happens next.
+  }
+
   function placeFloatRandomly() {
-    floatAnim.stop()
+    haltFloat()
     floatX = Math.random() * Math.max(0, floatAreaW - width)
     floatY = Math.random() * Math.max(0, floatAreaH - height)
     driftTimer.interval = 3000 + Math.random() * 4000
@@ -757,47 +846,28 @@ WidgetCard {
     mode = "travel"
     pupilTarget = 1.0
     modeTimer.stop()
-    moveEyeTo(nx, ny, 220, Easing.InOutSine, "travel")
+    moveEyeTo(nx, ny, 230, "travel")
   }
 
   // Shared mover for the floating eye(s): x/y are float-area coordinates of
-  // the top-left corner, speed in px/s.
+  // the top-left corner, maxSpeed in px/s; the reason picks the spring.
   property string moveReason: ""
-  function moveEyeTo(nx, ny, speed, easing, reason) {
+  function moveEyeTo(nx, ny, maxSpeed, reason) {
     var maxX = Math.max(0, floatAreaW - width), maxY = Math.max(0, floatAreaH - height)
-    nx = Math.max(0, Math.min(maxX, nx))
-    ny = Math.max(0, Math.min(maxY, ny))
-    var dist = Math.sqrt((nx - floatX) * (nx - floatX) + (ny - floatY) * (ny - floatY))
-    floatAnim.stop()
-    floatAnimX.to = nx
-    floatAnimY.to = ny
-    floatAnimX.easing.type = floatAnimY.easing.type = easing
-    floatAnimX.duration = floatAnimY.duration = Math.max(reason === "travel" ? 1500 : 320, dist / speed * 1000)
+    var prof = moveProfiles[reason] || moveProfiles.travel
+    floatTX = Math.max(0, Math.min(maxX, nx))
+    floatTY = Math.max(0, Math.min(maxY, ny))
+    floatOmega = prof.omega
+    floatMaxAccel = prof.accel
+    floatMaxSpeed = maxSpeed
     moveReason = reason
-    floatAnim.restart()
+    floatMoving = true
   }
 
   function resumeDrift() {
     if (!floating || !awake) return
     driftTimer.interval = 2500 + Math.random() * 5000
     driftTimer.restart()
-  }
-
-  ParallelAnimation {
-    id: floatAnim
-    NumberAnimation { id: floatAnimX; target: warden; property: "floatX"; easing.type: Easing.InOutSine }
-    NumberAnimation { id: floatAnimY; target: warden; property: "floatY"; easing.type: Easing.InOutSine }
-    onFinished: {
-      if (!warden.awake) return
-      if (warden.moveReason === "examine" && warden.mode === "examine") {
-        warden.startExamining()
-      } else if (warden.moveReason === "travel") {
-        warden.pickMode()
-        driftTimer.interval = 5000 + Math.random() * 8000
-        driftTimer.restart()
-      }
-      // "hurry": the hurry timer decides what happens next.
-    }
   }
 
   Timer {
