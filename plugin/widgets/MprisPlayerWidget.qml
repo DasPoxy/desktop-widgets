@@ -423,13 +423,27 @@ WidgetCard {
     try { url = (p.metadata && p.metadata["xesam:url"]) ? String(p.metadata["xesam:url"]) : "" } catch (e) {}
     lyricsProc.requestKey = mprisRoot.trackKey
     lyricsProc.command = [mprisRoot.lyricsScriptPath, p.trackArtist || "", p.trackTitle || "", p.trackAlbum || "", String(mprisRoot.lengthSec || 0), url]
+      .concat(lyricsProc.forceRefresh ? ["refresh"] : [])
+    lyricsProc.forceRefresh = false
     lyricsProc.running = true
+  }
+
+  // Refresh button: look the track up again, bypassing the on-disk cache
+  // (e.g. a cached miss, or a wrong match that got fixed on LRCLIB).
+  function refreshLyrics() {
+    if (!mprisRoot.trackKey) return
+    mprisRoot.lyricsLines = []
+    mprisRoot.lyricsSynced = false
+    mprisRoot.lyricsStatus = "loading"
+    lyricsProc.forceRefresh = true
+    mprisRoot.fetchLyrics()
   }
 
   Process {
     id: lyricsProc
     property string requestKey: ""
     property bool refetch: false
+    property bool forceRefresh: false
     running: false
     stdout: SplitParser {
       onRead: function(line) {
@@ -1059,6 +1073,48 @@ WidgetCard {
                 cursorShape: enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
                 onClicked: mprisRoot.seekToFrac((modelData.t / 1000) / mprisRoot.lengthSec)
               }
+            }
+          }
+
+          // Refresh lyrics (bypasses the cache) -- bottom-right corner.
+          Rectangle {
+            id: lyricsRefreshBtn
+            anchors.right: parent.right
+            anchors.bottom: parent.bottom
+            z: 2
+            visible: mprisRoot.trackKey !== ""
+            width: mprisRoot.sp(22)
+            height: width
+            radius: width / 2
+            color: refreshMouse.containsMouse ? Qt.rgba(Color.accent.r, Color.accent.g, Color.accent.b, 0.25) : Qt.rgba(mprisRoot.cSurface.r, mprisRoot.cSurface.g, mprisRoot.cSurface.b, 0.85)
+            border.color: Qt.rgba(1, 1, 1, 0.12)
+            border.width: 1
+            opacity: refreshMouse.containsMouse || loading ? 1.0 : 0.6
+            Behavior on opacity { NumberAnimation { duration: 150 } }
+            readonly property bool loading: mprisRoot.lyricsStatus === "loading"
+
+            Text {
+              id: refreshIcon
+              anchors.centerIn: parent
+              text: "󰑐"
+              font.family: Style.font.family
+              font.pixelSize: mprisRoot.sp(12)
+              color: Color.accent
+              RotationAnimation on rotation {
+                running: lyricsRefreshBtn.loading
+                from: 0; to: 360
+                duration: 900
+                loops: Animation.Infinite
+                onRunningChanged: if (!running) refreshIcon.rotation = 0
+              }
+            }
+
+            MouseArea {
+              id: refreshMouse
+              anchors.fill: parent
+              hoverEnabled: true
+              cursorShape: lyricsRefreshBtn.loading ? Qt.ArrowCursor : Qt.PointingHandCursor
+              onClicked: if (!lyricsRefreshBtn.loading) mprisRoot.refreshLyrics()
             }
           }
         }

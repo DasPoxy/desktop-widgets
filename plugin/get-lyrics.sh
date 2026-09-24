@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # Lyrics for the MPRIS Player widget.
-#   get-lyrics.sh <artist> <title> <album> <duration_sec> <track_url>
+#   get-lyrics.sh <artist> <title> <album> <duration_sec> <track_url> [refresh]
+# "refresh" skips the cache read (the result still replaces the cache entry).
 # Order: a sibling .lrc/.txt next to a local file:// track, then the on-disk
 # cache, then LRCLIB (lrclib.net -- free, no key, time-synced LRC). Misses
 # are cached too (retried after a day) so a track without lyrics doesn't hit
@@ -141,8 +142,9 @@ def from_local_file(track_url):
 
 
 def main():
-    args = sys.argv[1:] + [''] * 5
+    args = sys.argv[1:] + [''] * 6
     artist, title, album, duration_s, track_url = args[:5]
+    refresh = args[5] == 'refresh'
     try:
         duration = float(duration_s or 0)
     except ValueError:
@@ -161,6 +163,8 @@ def main():
     key = hashlib.sha1((artist.lower() + '\n' + title.lower()).encode()).hexdigest()
     cache_path = os.path.join(CACHE_DIR, key + '.json')
     try:
+        if refresh:
+            raise FileNotFoundError
         with open(cache_path, 'r', encoding='utf-8') as f:
             cached = json.load(f)
         if cached.get('status') != 'none' or time.time() - cached.get('cachedAt', 0) < MISS_RETRY_SEC:
