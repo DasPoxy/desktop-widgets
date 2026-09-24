@@ -586,10 +586,9 @@ WidgetCard {
           anchors.fill: parent
           hoverEnabled: true
           cursorShape: Qt.PointingHandCursor
-          onClicked: {
-            videoWidgetRoot.toggleLoop()
-            videoWidgetRoot.contextMenuOpen = false
-          }
+          // Menu stays open: closing it here would also re-hide a card that
+          // Hide While Paused only revealed because the menu was open.
+          onClicked: videoWidgetRoot.toggleLoop()
         }
       }
 
