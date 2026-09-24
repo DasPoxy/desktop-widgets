@@ -102,7 +102,29 @@ Canvas {
       lashW: 0.055, wing: 0.13, lashes: [[0.5, 0.08], [0.62, 0.11], [0.73, 0.13], [0.83, 0.14], [0.92, 0.12]], lower: 3, brow: "none", top: -0.7, bot: 0.46 },
     angular: { inner: 0.05, outer: -0.05, upY: -0.4, up1: -0.3, up2: 0.26, loY: 0.3, lo1: 0.3, lo2: -0.3, closedY: 0.14, angular: true,
       iris: 0.22, irisRy: 1.15, irisY: 0.02, pupil: "round", pupilR: 0.45, highlight: "classic",
-      lashW: 0.07, wing: 0.07, lashes: [], lower: 0, brow: "flat", browY: -0.5, top: -0.58, bot: 0.34 }
+      lashW: 0.07, wing: 0.07, lashes: [], lower: 0, brow: "flat", browY: -0.5, top: -0.58, bot: 0.34 },
+    // From the second batch of reference sheets.
+    triangle: { inner: 0.1, outer: 0.08, upY: -0.62, up1: -0.04, up2: 0.04, loY: 0.2, lo1: 0.3, lo2: -0.3, closedY: 0.14, angular: true,
+      iris: 0.19, irisRy: 1.1, irisY: 0.02, pupil: "round", pupilR: 0.42, highlight: "classic",
+      lashW: 0.07, wing: 0, lashes: [[0.3, 0.08], [0.45, 0.08], [0.6, 0.08]], lower: 0, brow: "none", top: -0.66, bot: 0.24 },
+    box: { inner: 0.0, outer: 0.0, upY: -0.36, up1: -0.5, up2: 0.5, loY: 0.3, lo1: 0.5, lo2: -0.5, closedY: 0.0, angular: true,
+      iris: 0.2, irisRy: 1.05, irisY: 0.0, pupil: "round", pupilR: 0.48, highlight: "classic",
+      lashW: 0.07, wing: 0, lashes: [], lower: 0, brow: "flat", browY: -0.46, top: -0.52, bot: 0.34 },
+    drowsy: { inner: 0.06, outer: 0.0, upY: -0.12, up1: -0.3, up2: 0.3, loY: 0.46, lo1: 0.26, lo2: -0.3, closedY: 0.16,
+      iris: 0.22, irisRy: 1.0, irisY: 0.12, pupil: "round", pupilR: 0.38, highlight: "soft",
+      lashW: 0.075, wing: 0.05, lashes: [], lower: 0, crease: true, brow: "none", top: -0.26, bot: 0.42 },
+    toon: { inner: 0.0, outer: 0.0, upY: -0.82, up1: -0.5, up2: 0.5, loY: 0.82, lo1: 0.5, lo2: -0.5, closedY: 0.0,
+      iris: 0.15, irisRy: 1.25, irisY: 0.05, pupil: "round", pupilR: 0.62, highlight: "classic",
+      lashW: 0.04, wing: 0, lashes: [], lower: 0, brow: "none", top: -0.68, bot: 0.66 },
+    fox: { inner: 0.08, outer: -0.2, upY: -0.3, up1: -0.15, up2: 0.3, loY: 0.2, lo1: 0.3, lo2: -0.2, closedY: 0.06,
+      iris: 0.19, irisRy: 1.1, irisY: 0.02, pupil: "round", pupilR: 0.42, highlight: "soft",
+      lashW: 0.065, wing: 0.2, lashes: [[0.9, 0.06]], lower: 0, brow: "none", top: -0.42, bot: 0.22 },
+    dome: { inner: 0.08, outer: 0.08, upY: -0.78, up1: -0.45, up2: 0.45, loY: 0.12, lo1: 0.3, lo2: -0.3, closedY: 0.12,
+      iris: 0.23, irisRy: 1.15, irisY: -0.08, pupil: "round", pupilR: 0.45, highlight: "big",
+      lashW: 0.055, wing: 0.04, lashes: [[0.72, 0.08], [0.84, 0.08]], lower: 0, brow: "arc", browY: -0.72, top: -0.84, bot: 0.2 },
+    doll: { inner: 0.04, outer: -0.02, upY: -0.64, up1: -0.3, up2: 0.26, loY: 0.52, lo1: 0.26, lo2: -0.3, closedY: 0.2,
+      iris: 0.27, irisRy: 1.2, irisY: 0.04, pupil: "tall", pupilR: 0.42, highlight: "big",
+      lashW: 0.05, wing: 0.06, lashes: [[0.15, 0.1], [0.3, 0.12], [0.45, 0.13], [0.6, 0.13], [0.75, 0.13], [0.88, 0.12]], lower: 6, brow: "none", top: -0.7, bot: 0.56 }
   })
 
   // Iris styles: pattern (cel | rings | petal | spiral | hollow | crosshair |
@@ -131,7 +153,17 @@ Canvas {
     mangekyo: { pattern: "pinwheel", pupil: "none", pupilR: 0.22, highlight: "soft", spin: 0.35, colors: { iris: "#cc1530", irisDark: "#5e0612", irisLight: "#ff6b6b", pupil: "#0d0406" } },
     scythe: { pattern: "scythe", pupil: "round", pupilR: 0.14, highlight: "soft", spin: 0.35, colors: { iris: "#cc1530", irisDark: "#5e0612", irisLight: "#ff6b6b", pupil: "#0d0406" } },
     rinnegan: { pattern: "rinnegan", pupil: "round", pupilR: 0.08, highlight: "tiny", colors: { iris: "#b7a3dd", irisDark: "#3f2f66", irisLight: "#e3d8f7", pupil: "#2a1f47" } },
-    byakugan: { pattern: "byakugan", pupil: "none", pupilR: 0, highlight: "none", veins: true, colors: { iris: "#ece9f6", irisDark: "#aaa3cc", irisLight: "#ffffff", pupil: "#ece9f6" } }
+    byakugan: { pattern: "byakugan", pupil: "none", pupilR: 0, highlight: "none", veins: true, colors: { iris: "#ece9f6", irisDark: "#aaa3cc", irisLight: "#ffffff", pupil: "#ece9f6" } },
+    // From the second batch of reference sheets.
+    heartstar: { pattern: "heartstar", pupil: "none", pupilR: 0, highlight: "classic" },
+    starpupil: { pattern: "cel", pupil: "star", pupilR: 0.5, highlight: "classic" },
+    flower: { pattern: "flower", pupil: "round", pupilR: 0.24, highlight: "classic" },
+    sunburst: { pattern: "rays", pupil: "sun", pupilR: 0.42, highlight: "soft" },
+    compass: { pattern: "compass", pupil: "none", pupilR: 0, highlight: "soft" },
+    glass: { pattern: "glass", pupil: "round", pupilR: 0.2, highlight: "none" },
+    arcs: { pattern: "arcs", pupil: "none", pupilR: 0, highlight: "big" },
+    eclipse: { pattern: "eclipse", pupil: "none", pupilR: 0, highlight: "classic" },
+    streaks: { pattern: "streaks", pupil: "none", pupilR: 0, highlight: "none" }
   })
 
   function col(key, fallback) {
@@ -353,6 +385,18 @@ Canvas {
     }
 
     function polar(r, a) { return [Math.cos(a) * r, Math.sin(a) * r] }
+    // n-pointed star centred on (x, y).
+    function star(x, y, ro, ri, n, color) {
+      ctx.fillStyle = color
+      ctx.beginPath()
+      for (var si = 0; si < n * 2; si++) {
+        var sa = -Math.PI / 2 + si * Math.PI / n, sr = si % 2 ? ri : ro
+        if (si === 0) ctx.moveTo(x + Math.cos(sa) * sr, y + Math.sin(sa) * sr)
+        else ctx.lineTo(x + Math.cos(sa) * sr, y + Math.sin(sa) * sr)
+      }
+      ctx.closePath()
+      ctx.fill()
+    }
     var pat = irs.pattern
     if (pat === "cel") {
       cap(true); crescent(1); flecks()
@@ -471,6 +515,99 @@ Canvas {
       // Near-white and pupil-less: just faint rings.
       ring(R * 0.62, R * 0.03, rgba(irisDark, 0.45))
       ring(R * 0.9, R * 0.02, rgba(irisDark, 0.35))
+    } else if (pat === "heartstar") {
+      // Dark centre framing a heart outline with a sparkle in it.
+      cap(false); crescent(1)
+      ctx.fillStyle = irisDark
+      ctx.beginPath(); ctx.arc(0, 0, R * 0.62, 0, Math.PI * 2); ctx.fill()
+      var hh = R * 0.42
+      ctx.strokeStyle = irisLight
+      ctx.lineWidth = R * 0.045
+      ctx.beginPath()
+      ctx.moveTo(0, hh * 0.85)
+      ctx.bezierCurveTo(-hh * 1.25, 0, -hh * 0.65, -hh * 1.0, 0, -hh * 0.42)
+      ctx.bezierCurveTo(hh * 0.65, -hh * 1.0, hh * 1.25, 0, 0, hh * 0.85)
+      ctx.stroke()
+      star(0, hh * 0.05, R * 0.2, R * 0.06, 6, col("highlight", "#fff7ea"))
+    } else if (pat === "flower") {
+      // A wavy, petal-edged ring around the pupil.
+      cap(true); crescent(1)
+      ctx.strokeStyle = lash
+      ctx.lineWidth = R * 0.05
+      ctx.beginPath()
+      for (var fw = 0; fw <= 96; fw++) {
+        var fa = fw / 96 * Math.PI * 2, fr = R * (0.52 + 0.07 * Math.sin(fa * 8))
+        if (fw === 0) ctx.moveTo(Math.cos(fa) * fr, Math.sin(fa) * fr)
+        else ctx.lineTo(Math.cos(fa) * fr, Math.sin(fa) * fr)
+      }
+      ctx.stroke()
+    } else if (pat === "rays") {
+      // Sunburst: light rays fanning out from the pupil.
+      crescent(1)
+      ctx.strokeStyle = rgba(irisLight, 0.8)
+      ctx.lineWidth = R * 0.04
+      ctx.lineCap = "round"
+      for (var rsn = 0; rsn < 16; rsn++) {
+        var rsa = rsn / 16 * Math.PI * 2
+        ctx.beginPath()
+        ctx.moveTo(Math.cos(rsa) * R * 0.5, Math.sin(rsa) * R * 0.5)
+        ctx.lineTo(Math.cos(rsa) * R * (rsn % 2 ? 0.72 : 0.86), Math.sin(rsa) * R * (rsn % 2 ? 0.72 : 0.86))
+        ctx.stroke()
+      }
+    } else if (pat === "compass") {
+      // A ringed pupil with a cross through it.
+      cap(true); crescent(1)
+      ring(R * 0.34, R * 0.07, ic.pupil || lash)
+      ctx.strokeStyle = ic.pupil || lash
+      ctx.lineWidth = R * 0.06
+      ctx.lineCap = "butt"
+      ctx.beginPath()
+      ctx.moveTo(-R * 0.34, 0); ctx.lineTo(R * 0.34, 0)
+      ctx.moveTo(0, -R * 0.34); ctx.lineTo(0, R * 0.34)
+      ctx.stroke()
+    } else if (pat === "glass") {
+      // Glassy: fine radial streaks and a vertical lens flare.
+      crescent(1)
+      ctx.strokeStyle = rgba(irisDark, 0.55)
+      ctx.lineWidth = R * 0.018
+      for (var gl = 0; gl < 48; gl++) {
+        var gla = gl / 48 * Math.PI * 2, gr0 = R * (0.3 + (gl % 3) * 0.05)
+        ctx.beginPath()
+        ctx.moveTo(Math.cos(gla) * gr0, Math.sin(gla) * gr0)
+        ctx.lineTo(Math.cos(gla) * R * 0.93, Math.sin(gla) * R * 0.93)
+        ctx.stroke()
+      }
+      ctx.fillStyle = rgba(col("highlight", "#fff7ea"), 0.75)
+      ctx.beginPath(); ctx.ellipse(-R * 0.05, -R * 0.85, R * 0.1, R * 1.7); ctx.fill()
+      ctx.beginPath(); ctx.ellipse(-R * 0.5, -R * 0.05, R * 1.0, R * 0.1); ctx.fill()
+    } else if (pat === "arcs") {
+      // Deep dark iris, a small ringed pupil, and smile-shaped reflections.
+      ctx.fillStyle = irisDark
+      ctx.beginPath(); ctx.arc(0, 0, R * 0.9, 0, Math.PI * 2); ctx.fill()
+      ring(R * 0.13, R * 0.06, rgba(irisLight, 0.9))
+      ctx.strokeStyle = rgba(irisLight, 0.85)
+      ctx.lineWidth = R * 0.06
+      ctx.lineCap = "round"
+      ctx.beginPath(); ctx.arc(0, R * 0.05, R * 0.4, Math.PI * 0.2, Math.PI * 0.8); ctx.stroke()
+      ctx.lineWidth = R * 0.04
+      ctx.beginPath(); ctx.arc(0, R * 0.05, R * 0.6, Math.PI * 0.28, Math.PI * 0.72); ctx.stroke()
+    } else if (pat === "eclipse") {
+      // Solid black disc with a thin ring of light near its edge.
+      ctx.fillStyle = ic.pupil || col("pupil", "#1c1f3f")
+      ctx.beginPath(); ctx.arc(0, 0, R, 0, Math.PI * 2); ctx.fill()
+      ring(R * 0.82, R * 0.05, rgba(irisLight, 0.9))
+    } else if (pat === "streaks") {
+      // Stunned: vertical stripes filling the iris (chord-clipped by hand).
+      ctx.strokeStyle = irisDark
+      ctx.lineWidth = R * 0.09
+      ctx.lineCap = "butt"
+      for (var sx2 = -0.8; sx2 <= 0.81; sx2 += 0.2) {
+        var half = Math.sqrt(Math.max(0, 1 - sx2 * sx2)) * R * 0.92
+        ctx.beginPath()
+        ctx.moveTo(sx2 * R, -half)
+        ctx.lineTo(sx2 * R, half)
+        ctx.stroke()
+      }
     }
 
     // Buddy Mode recording glow, part one: the iris lights up from within in
@@ -507,6 +644,10 @@ Canvas {
       ctx.bezierCurveTo(-pr * 1.25, 0, -pr * 0.65, -pr * 1.0, 0, -pr * 0.42)
       ctx.bezierCurveTo(pr * 0.65, -pr * 1.0, pr * 1.25, 0, 0, pr * 0.85)
       ctx.fill()
+    } else if (pupilShape === "star") {
+      star(0, pr * 0.08, pr * 1.1, pr * 0.45, 5, ic.pupil || col("pupil", "#1c1f3f"))
+    } else if (pupilShape === "sun") {
+      star(0, 0, pr * 1.05, pr * 0.55, 8, ic.pupil || col("pupil", "#1c1f3f"))
     } else if (pupilShape !== "none") {
       ctx.arc(0, 0, pr, 0, Math.PI * 2)
       ctx.fill()

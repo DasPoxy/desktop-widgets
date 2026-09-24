@@ -19,12 +19,14 @@ Item {
   property real pupilScale: 1
   property real glow: 1
   property real irisGlow: 0
+  // Off for the static previews in the menu.
+  property bool animate: true
 
   // Seconds of animation time: drives the stalk sway and the little eyes'
   // own wandering. Only ticks while awake.
   property real t: 0
   FrameAnimation {
-    running: beholder.visible && beholder.openness > 0.05
+    running: beholder.animate && beholder.visible && beholder.openness > 0.05
     onTriggered: beholder.t += frameTime
   }
 

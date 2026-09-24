@@ -81,7 +81,20 @@ WidgetCard {
   }
   // Switching form reshapes the widget around it (same height, width to
   // suit), so the eyes stay about the same size.
-  readonly property var formAspect: ({ one: 1.65, pair: 2.6, beholder: 1.3 })
+  readonly property var formAspect: ({ one: 1.65, pair: 2.6, beholder: 1.3, jelly: 0.74, saucer: 1.14, ghost: 0.88, djinn: 0.71, skull: 0.92 })
+
+  // Buddy Types, in menu order (drawing: AbyssEyes / AbyssBeholder /
+  // AbyssCreature).
+  readonly property var buddyTypes: [
+    { id: "one", name: "One Eye" },
+    { id: "pair", name: "Pair" },
+    { id: "beholder", name: "Beholder" },
+    { id: "jelly", name: "Jellyfish" },
+    { id: "saucer", name: "Saucer" },
+    { id: "ghost", name: "Ghost" },
+    { id: "djinn", name: "Djinn" },
+    { id: "skull", name: "Skull" }
+  ]
   function reshapeForForm() {
     var a = formAspect[form] || 1.65
     setEyeSize(warden.height * a, 1 / a)
@@ -138,7 +151,16 @@ WidgetCard {
     { id: "mangekyo", name: "Mangekyō" },
     { id: "scythe", name: "Mangekyō II" },
     { id: "rinnegan", name: "Rinnegan" },
-    { id: "byakugan", name: "Byakugan" }
+    { id: "byakugan", name: "Byakugan" },
+    { id: "heartstar", name: "Heart Star" },
+    { id: "starpupil", name: "Star Pupil" },
+    { id: "flower", name: "Flower" },
+    { id: "sunburst", name: "Sunburst" },
+    { id: "compass", name: "Compass" },
+    { id: "glass", name: "Glass" },
+    { id: "arcs", name: "Arcs" },
+    { id: "eclipse", name: "Eclipse" },
+    { id: "streaks", name: "Streaks" }
   ]
 
   function setEyeStyle(id) {
@@ -156,7 +178,14 @@ WidgetCard {
     { id: "shocked", name: "Shocked" },
     { id: "hypnotic", name: "Hypnotic" },
     { id: "shoujo", name: "Shoujo" },
-    { id: "angular", name: "Angular" }
+    { id: "angular", name: "Angular" },
+    { id: "triangle", name: "Triangle" },
+    { id: "box", name: "Boxy" },
+    { id: "drowsy", name: "Drowsy" },
+    { id: "toon", name: "Toon" },
+    { id: "fox", name: "Fox" },
+    { id: "dome", name: "Dome" },
+    { id: "doll", name: "Doll" }
   ]
 
   function setTheme(id) {
@@ -1239,52 +1268,66 @@ WidgetCard {
         onToggled: warden.toggleSetting("chaseFastMouse")
       }
 
-      Text {
-        Layout.fillWidth: true
-        Layout.leftMargin: Style.space(8)
-        Layout.topMargin: Style.space(4)
-        text: "EYES"
-        font.family: Style.font.family
-        font.pixelSize: 9
-        font.weight: Font.Bold
-        color: Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.45)
+      SectionHeader {
+        label: "BUDDY TYPE"
+        value: warden.nameOf(warden.buddyTypes, warden.form)
+        open: !!warden.openSections.buddy
+        onToggled: warden.toggleSection("buddy")
       }
 
-      // One eye | a pair.
-      RowLayout {
+      // Each chip previews the buddy in the current eye style, iris and theme.
+      GridLayout {
+        visible: !!warden.openSections.buddy
         Layout.fillWidth: true
         Layout.leftMargin: Style.space(4)
         Layout.rightMargin: Style.space(4)
-        spacing: Style.space(4)
+        columns: 4
+        columnSpacing: Style.space(4)
+        rowSpacing: Style.space(4)
 
         Repeater {
-          model: [{ label: "One", glyph: "󰈈", form: "one" }, { label: "Pair", glyph: "󰈈󰈈", form: "pair" }, { label: "Beholder", glyph: "\uf188", form: "beholder" }]
+          model: warden.buddyTypes
 
           Rectangle {
             required property var modelData
-            readonly property bool selected: warden.form === modelData.form
+            readonly property bool selected: warden.form === modelData.id
             Layout.fillWidth: true
-            implicitHeight: 28
+            implicitHeight: 62
             radius: 6
             color: selected ? Qt.rgba(Color.accent.r, Color.accent.g, Color.accent.b, 0.22)
-              : (countMouse.containsMouse ? Qt.rgba(1, 1, 1, 0.06) : "transparent")
+              : (buddyMouse.containsMouse ? Qt.rgba(1, 1, 1, 0.06) : "transparent")
             border.color: selected ? Color.accent : Qt.rgba(1, 1, 1, 0.1)
             border.width: 1
 
+            AbyssEyes {
+              anchors.top: parent.top
+              anchors.topMargin: 3
+              anchors.horizontalCenter: parent.horizontalCenter
+              width: parent.width - 6
+              height: 40
+              animate: false
+              form: modelData.id
+              styleId: warden.eyeStyle
+              irisStyle: warden.irisStyle
+              theme: warden.theme
+              glow: 0
+            }
             Text {
-              anchors.centerIn: parent
-              text: modelData.glyph + "  " + modelData.label
+              anchors.bottom: parent.bottom
+              anchors.bottomMargin: 3
+              anchors.horizontalCenter: parent.horizontalCenter
+              text: modelData.name
               font.family: Style.font.family
-              font.pixelSize: 10
+              font.pixelSize: 9
               color: parent.selected ? Color.accent : Color.foreground
             }
 
             MouseArea {
-              id: countMouse
+              id: buddyMouse
               anchors.fill: parent
               hoverEnabled: true
               cursorShape: Qt.PointingHandCursor
-              onClicked: warden.setForm(modelData.form)
+              onClicked: warden.setForm(modelData.id)
             }
           }
         }
