@@ -3,6 +3,7 @@ import QtQuick.Layouts
 import Quickshell
 import Quickshell.Io
 import Quickshell.Wayland
+import Quickshell.Services.Mpris
 import qs.Commons
 import qs.Ui
 
@@ -50,6 +51,14 @@ WidgetCard {
   // Which menu sections are expanded, e.g. { style: true }. All start folded.
   property var openSections: ({})
   property bool chaseFastMouse: true
+  // Reactions (Behaviour section): dance while music plays, jump when a
+  // window closes, go and read new notifications, glance at the clock as
+  // the minute turns, and now and then lean in and tap on the screen.
+  property bool danceToMusic: true
+  property bool reactToClosing: true
+  property bool watchNotifications: true
+  property bool checkClock: true
+  property bool tapScreen: true
 
   function applySavedSettings() {
     themeId = getSetting("themeId", "system")
@@ -64,6 +73,11 @@ WidgetCard {
     themeColors = getSetting("themeColors", true)
     openSections = getSetting("openSections", {})
     chaseFastMouse = getSetting("chaseFastMouse", true)
+    danceToMusic = getSetting("danceToMusic", true)
+    reactToClosing = getSetting("reactToClosing", true)
+    watchNotifications = getSetting("watchNotifications", true)
+    checkClock = getSetting("checkClock", true)
+    tapScreen = getSetting("tapScreen", true)
   }
   onSettingsLoaded: applySavedSettings()
   onRootRefChanged: applySavedSettings()
@@ -147,7 +161,13 @@ WidgetCard {
     if (showCard) on.push("Card")
     if (examineClicks) on.push("Clicks")
     if (chaseFastMouse) on.push("Chase")
-    return on.length ? on.join(" · ") : "all off"
+    if (danceToMusic) on.push("Dance")
+    if (reactToClosing) on.push("Jumpy")
+    if (watchNotifications) on.push("Notifs")
+    if (checkClock) on.push("Clock")
+    if (tapScreen) on.push("Tap")
+    if (!on.length) return "all off"
+    return on.length > 3 ? on.slice(0, 2).join(" · ") + " +" + (on.length - 2) : on.join(" · ")
   }
   function nameOf(list, id) {
     for (var i = 0; i < list.length; i++) if (list[i].id === id) return list[i].name
@@ -338,6 +358,10 @@ WidgetCard {
           warden.windowsList = msg.list || []
         } else if (msg.type === "click") {
           warden.handleClick(msg.x, msg.y, msg.win || null)
+        } else if (msg.type === "closed") {
+          warden.handleClosed(msg.x, msg.y)
+        } else if (msg.type === "notify") {
+          warden.handleNotify()
         }
       }
     }
@@ -369,7 +393,12 @@ WidgetCard {
   // the clicked window; floating flies over first), hurry (rapid mouse
   // movement: freeze and stare, pupils snap small; floating rushes over),
   // scan (instead of following the mouse it sometimes wanders off to trace
-  // the edge of a window or check the bar, then comes back to the mouse).
+  // the edge of a window or check the bar, then comes back to the mouse),
+  // surprised (a window closed: jump, pupils pinned on where it was),
+  // notify (read a new notification; floating flies over), clock (glance at
+  // a desktop clock or the bar as the minute turns), dance (music playing;
+  // floating dances beside the music widget), tap (lean in to the glass and
+  // knock on it).
   // ---------------------------------------------------------------------------
   property string mode: "wander"
   property real lookX: 0          // global point for window/travel modes
@@ -410,6 +439,11 @@ WidgetCard {
       driftTimer.stop()
       rushDelay.stop()
       examineLook.stop()
+      hopAnim.stop()
+      tapAnim.stop()
+      bodyScale = 1
+      bodyY = 0
+      bodyRot = 0
       squint = 0
       mode = "wander"
       sleepAnim.restart()
@@ -467,6 +501,8 @@ WidgetCard {
 
   function pickMode() {
     squint = 0
+    if (danceToMusic && musicPlaying && Math.random() < 0.3) { startDance(); return }
+    if (tapScreen && Math.random() < 0.05) { startTap(); return }
     var recentMouse = Date.now() - lastCursorMove < 1500
     var r = Math.random()
     var cursorW = recentMouse ? 0.55 : 0.3
@@ -494,7 +530,7 @@ WidgetCard {
     interval: 3000
     onTriggered: {
       if (!warden.awake) return
-      var wasBusy = warden.mode === "examine"
+      var wasBusy = warden.holdsPosition()
       warden.pickMode()
       if (wasBusy) warden.resumeDrift()
     }
@@ -522,7 +558,7 @@ WidgetCard {
   }
 
   function handleActivity(x, y) {
-    if (!awake || mode === "travel" || mode === "examine" || mode === "hurry" || mode === "scan") return
+    if (!awake || mode === "travel" || holdsPosition()) return
     var now = Date.now()
     if (now - lastActivity < 2500 || Math.random() > 0.8) return
     lastActivity = now
@@ -554,6 +590,7 @@ WidgetCard {
     examineWin = win
     lookX = x
     lookY = y
+    settleBody()
     mode = "examine"
     squint = 1
     pupil = 0.8            // quick focus...
@@ -637,6 +674,7 @@ WidgetCard {
     lastRapid = Date.now()
     if (mode === "hurry") return
     // Freeze and stare: whatever it was doing stops.
+    settleBody()
     mode = "hurry"
     squint = 0
     pupil = 0.62
@@ -783,6 +821,248 @@ WidgetCard {
     resumeDrift()
   }
 
+  // --- Reactions -----------------------------------------------------------
+  // Body motion shared by the reactions, applied to the card and floating
+  // eyes alike: bodyY (fraction of height, negative = up), bodyRot (deg),
+  // bodyScale (1 = resting; > 1 = leaning toward the viewer).
+  property real bodyY: 0
+  property real bodyRot: 0
+  property real bodyScale: 1
+  property real rippleT: 1        // knock ripple, 0..1 (1 = gone)
+
+  // Modes that keep the eyes where they are (no drifting off, no glancing
+  // at every window event).
+  function holdsPosition() {
+    return mode === "examine" || mode === "hurry" || mode === "scan" || mode === "surprised"
+      || mode === "notify" || mode === "clock" || mode === "dance" || mode === "tap"
+  }
+  // Only a click or a flick of the mouse cuts these short.
+  function reactionBusy() {
+    return mode === "examine" || mode === "hurry" || mode === "tap" || mode === "surprised"
+  }
+  function settleBody() {
+    if (tapAnim.running) tapAnim.stop()
+    if (bodyScale !== 1) settleAnim.restart()
+  }
+  NumberAnimation { id: settleAnim; target: warden; property: "bodyScale"; to: 1; duration: 260; easing.type: Easing.OutCubic }
+
+  function beginReaction(newMode, holdMs) {
+    settleBody()
+    mode = newMode
+    blinkAnim.stop()
+    examineLook.stop()
+    modeTimer.interval = holdMs
+    modeTimer.restart()
+    if (floating) {
+      driftTimer.stop()
+      if (floatMoving && moveReason === "travel") stopFloat()
+    }
+  }
+
+  // A rect of another desktop widget on this monitor, in monitor-local
+  // coordinates, or null if it isn't showing here.
+  function widgetRect(id) {
+    if (!rootRef || !rootRef.isWidgetActiveOnMonitor || !rootRef.isWidgetActiveOnMonitor(id, monitorName)) return null
+    var mp = rootRef.monitorPositions
+    var p = (mp && mp[monitorName] && mp[monitorName][id]) || (rootRef.widgetPositions || {})[id]
+    if (!p) return null
+    return { x: p.x, y: p.y, w: p.w || 200, h: p.h || 120 }
+  }
+  // Floating: sit beside a monitor-local rect, on whichever side has room.
+  function moveBeside(r, speed, reason) {
+    var ox = reserved[0], oy = reserved[1]
+    var roomRight = (monitor.w || screenWidth) - reserved[2] - (r.x + r.w)
+    var nx = roomRight > width + 40 ? r.x + r.w + 24 : r.x - width - 24
+    var ny = r.y + r.h / 2 - height / 2
+    moveEyeTo(nx - ox, ny - oy, speed, reason)
+  }
+
+  // Window closed: jump, then stare at the spot it vanished from.
+  SequentialAnimation {
+    id: hopAnim
+    ParallelAnimation {
+      NumberAnimation { target: warden; property: "bodyY"; to: -0.16; duration: 110; easing.type: Easing.OutQuad }
+      NumberAnimation { target: warden; property: "bodyScale"; to: 1.07; duration: 110 }
+    }
+    ParallelAnimation {
+      NumberAnimation { target: warden; property: "bodyY"; to: 0; duration: 420; easing.type: Easing.OutBounce }
+      NumberAnimation { target: warden; property: "bodyScale"; to: 1; duration: 300 }
+    }
+  }
+  function handleClosed(x, y) {
+    if (!awake || !reactToClosing || reactionBusy() || Math.random() > 0.7) return
+    beginReaction("surprised", 1500 + Math.random() * 900)
+    lookX = x
+    lookY = y
+    squint = 0
+    openness = 1
+    pupil = 0.5
+    pupilTarget = 0.75
+    hopAnim.restart()
+  }
+
+  // Notification: go and read it (Omarchy's popups sit top-right, under
+  // the bar), eyes skimming across the card like lines of text.
+  property real notifyX: 0
+  property real notifyY: 0
+  function handleNotify() {
+    if (!awake || !watchNotifications || reactionBusy()) return
+    notifyX = monitor.x + (monitor.w || screenWidth) - reserved[2] - 210
+    notifyY = monitor.y + reserved[1] + 60
+    beginReaction("notify", 3000 + Math.random() * 1500)
+    lookX = notifyX
+    lookY = notifyY
+    squint = 0.3
+    pupil = 0.8
+    pupilTarget = 1.15
+    if (floating) moveBeside({ x: notifyX - monitor.x - 200, y: notifyY - monitor.y - 40, w: 400, h: 80 }, 900, "notify")
+  }
+  Timer {
+    running: warden.awake && warden.mode === "notify"
+    interval: 420
+    repeat: true
+    onTriggered: {
+      interval = 260 + Math.random() * 280
+      warden.lookX = warden.notifyX - 150 + Math.random() * 300
+      warden.lookY = warden.notifyY - 20 + Math.random() * 40
+    }
+  }
+
+  // Clock: as the minute turns, now and then (always on the hour) glance
+  // at a desktop clock on this monitor, or the middle of the bar.
+  property int lastMinute: -1
+  Timer {
+    running: warden.awake && warden.checkClock
+    interval: 1000
+    repeat: true
+    onTriggered: {
+      var m = new Date().getMinutes()
+      if (warden.lastMinute < 0 || m === warden.lastMinute) { warden.lastMinute = m; return }
+      warden.lastMinute = m
+      if (m === 0 || Math.random() < 0.25) warden.glanceAtClock(m === 0)
+    }
+  }
+  function glanceAtClock(onHour) {
+    if (reactionBusy() || mode === "notify") return
+    var ids = ["horizon_clock", "clock", "analog_clock"], r = null
+    for (var i = 0; i < ids.length && !r; i++) r = widgetRect(ids[i])
+    var cx, cy
+    if (r) {
+      cx = monitor.x + r.x + r.w / 2
+      cy = monitor.y + r.y + r.h / 2
+    } else {
+      var bar = barLine()
+      if (!bar) return
+      cx = (bar.x0 + bar.x1) / 2
+      cy = bar.y
+    }
+    beginReaction("clock", onHour ? 3600 : 2000 + Math.random() * 1200)
+    lookX = cx
+    lookY = cy
+    squint = 0.2
+    pupilTarget = onHour ? 1.3 : 1.1
+    if (onHour) {
+      blinkAnim.twice = true
+      blinkAnim.restart()
+      hopAnim.restart()
+    }
+    if (floating && r) moveBeside(r, 700, "clock")
+  }
+
+  // Music: dance while it plays -- floating dances beside the music widget
+  // (Karaoke Player, else the Media Player) if one is on this monitor.
+  readonly property var mprisPlayers: Mpris.players ? Mpris.players.values : []
+  readonly property bool musicPlaying: {
+    for (var i = 0; i < mprisPlayers.length; i++)
+      if (mprisPlayers[i].playbackState === MprisPlaybackState.Playing) return true
+    return false
+  }
+  property real danceT: 0
+  readonly property real danceBeat: 2    // beats per second (~120 bpm)
+  onMusicPlayingChanged: {
+    if (musicPlaying) Qt.callLater(startDance)
+    else if (mode === "dance") stopDance()
+  }
+  function startDance() {
+    if (!awake || !danceToMusic || !musicPlaying || reactionBusy() || mode === "dance") return
+    beginReaction("dance", 7000 + Math.random() * 6000)
+    danceT = 0
+    squint = 0.35      // happy squint
+    pupilTarget = 1.15
+    if (floating) {
+      var r = widgetRect("mpris_player") || widgetRect("media")
+      if (r) moveBeside(r, 700, "dance")
+    }
+  }
+  // Music stopped mid-dance: a disappointed droop, then carry on.
+  function stopDance() {
+    mode = "stare"
+    pupilTarget = 1.3
+    squint = 0.5
+    modeTimer.interval = 900
+    modeTimer.restart()
+  }
+
+  // Tap: lean in toward the viewer and knock on the glass a few times.
+  SequentialAnimation {
+    id: tapAnim
+    NumberAnimation { target: warden; property: "bodyScale"; to: 1.24; duration: 380; easing.type: Easing.OutCubic }
+    PauseAnimation { duration: 260 }
+    ScriptAction { script: warden.knock() }
+    NumberAnimation { target: warden; property: "bodyScale"; to: 1.3; duration: 55; easing.type: Easing.OutQuad }
+    NumberAnimation { target: warden; property: "bodyScale"; to: 1.24; duration: 110; easing.type: Easing.InQuad }
+    PauseAnimation { duration: 150 }
+    ScriptAction { script: warden.knock() }
+    NumberAnimation { target: warden; property: "bodyScale"; to: 1.3; duration: 55; easing.type: Easing.OutQuad }
+    NumberAnimation { target: warden; property: "bodyScale"; to: 1.24; duration: 110; easing.type: Easing.InQuad }
+    PauseAnimation { duration: 150 }
+    ScriptAction { script: if (Math.random() < 0.6) warden.knock() }
+    NumberAnimation { target: warden; property: "bodyScale"; to: 1.3; duration: 55; easing.type: Easing.OutQuad }
+    NumberAnimation { target: warden; property: "bodyScale"; to: 1.24; duration: 110; easing.type: Easing.InQuad }
+    PauseAnimation { duration: 550 }
+    NumberAnimation { target: warden; property: "bodyScale"; to: 1; duration: 450; easing.type: Easing.InOutCubic }
+    ScriptAction { script: warden.endTap() }
+  }
+  NumberAnimation { id: rippleAnim; target: warden; property: "rippleT"; from: 0; to: 1; duration: 560; easing.type: Easing.OutCubic }
+  function startTap() {
+    beginReaction("tap", 60000)   // tapAnim ends it
+    modeTimer.stop()
+    squint = 0
+    pupilTarget = 1.3
+    if (floating) stopFloat()
+    tapAnim.restart()
+  }
+  function knock() {
+    rippleAnim.restart()
+    pupil = 0.92
+  }
+  function endTap() {
+    if (!awake) return
+    pickMode()
+    resumeDrift()
+  }
+
+  // Knock ripple on the glass, over the eyes.
+  component KnockRipple: Item {
+    anchors.fill: parent
+    visible: warden.rippleT < 1
+    Repeater {
+      model: 2
+      Rectangle {
+        required property int index
+        readonly property real t: Math.max(0, Math.min(1, warden.rippleT * 1.25 - index * 0.25))
+        anchors.centerIn: parent
+        width: Math.min(parent.width, parent.height) * (0.35 + 0.9 * t)
+        height: width
+        radius: width / 2
+        color: "transparent"
+        border.width: Math.max(1, 3 * (1 - t))
+        border.color: warden.theme.highlight || "#ffffff"
+        opacity: (1 - t) * (index === 0 ? 0.75 : 0.45)
+      }
+    }
+  }
+
   // --- Geometry: where the eye is, in global (Hyprland) coordinates
   readonly property var monitor: {
     var m = monitorsMap[monitorName]
@@ -821,8 +1101,22 @@ WidgetCard {
       tx = wanderX; ty = wanderY
     } else if (mode === "cursor" || mode === "hurry") {
       var d = directionTo(cursorX, cursorY); tx = d.x; ty = d.y
-    } else if (mode === "window" || mode === "travel" || mode === "examine" || mode === "scan") {
+    } else if (mode === "window" || mode === "travel" || mode === "examine" || mode === "scan"
+               || mode === "surprised" || mode === "notify" || mode === "clock") {
       var w = directionTo(lookX, lookY); tx = w.x; ty = w.y
+    } else if (mode === "dance") {
+      // Sway side to side on the beat, bounce on every one.
+      danceT += dt
+      var beat = Math.sin(Math.PI * danceBeat * danceT)
+      tx = beat * 0.45
+      ty = -0.12 + Math.abs(beat) * 0.12
+      bodyRot = beat * 8
+      bodyY = -Math.abs(beat) * 0.07
+    }
+    if (mode !== "dance" && !hopAnim.running) {
+      var k = Math.exp(-dt * 10)
+      bodyRot *= k
+      bodyY *= k
     }
     tx += jitterX
     ty += jitterY
@@ -873,6 +1167,9 @@ WidgetCard {
     scan: { omega: 2.2, accel: 1400 },
     examine: { omega: 2.6, accel: 2200 },
     hurry: { omega: 3.6, accel: 3600 },   // rushing over
+    notify: { omega: 2.6, accel: 2200 },
+    clock: { omega: 2.2, accel: 1400 },
+    dance: { omega: 2.0, accel: 1200 },
     stop: { omega: 4.5, accel: 3000 }     // braking to a halt
   })
 
@@ -988,7 +1285,7 @@ WidgetCard {
 
   Timer {
     id: driftTimer
-    onTriggered: if (warden.awake && warden.floating && warden.mode !== "examine" && warden.mode !== "hurry" && warden.mode !== "scan") warden.drift()
+    onTriggered: if (warden.awake && warden.floating && !warden.holdsPosition()) warden.drift()
   }
 
   onFloatingChanged: if (floating && awake) placeFloatRandomly()
@@ -1024,10 +1321,18 @@ WidgetCard {
       mask: Region {}
 
       AbyssEyes {
+        id: floatEyes
         x: warden.floatX
         y: warden.floatY
         width: warden.width
         height: warden.height
+        transform: [
+          Scale { origin.x: floatEyes.width / 2; origin.y: floatEyes.height / 2; xScale: warden.bodyScale; yScale: warden.bodyScale },
+          Rotation { origin.x: floatEyes.width / 2; origin.y: floatEyes.height * 0.8; angle: warden.bodyRot },
+          Translate { y: warden.bodyY * floatEyes.height }
+        ]
+
+        KnockRipple {}
         form: warden.form
         styleId: warden.eyeStyle
         irisStyle: warden.irisStyle
@@ -1059,12 +1364,19 @@ WidgetCard {
     styleId: warden.eyeStyle
     irisStyle: warden.irisStyle
     theme: warden.theme
+    transform: [
+      Scale { origin.x: cardEye.width / 2; origin.y: cardEye.height / 2; xScale: warden.floating ? 1 : warden.bodyScale; yScale: warden.floating ? 1 : warden.bodyScale },
+      Rotation { origin.x: cardEye.width / 2; origin.y: cardEye.height * 0.8; angle: warden.floating ? 0 : warden.bodyRot },
+      Translate { y: warden.floating ? 0 : warden.bodyY * cardEye.height }
+    ]
     gazeX: warden.floating ? 0 : warden.gazeX
     gazeY: warden.floating ? 0 : warden.gazeY
     openness: warden.floating ? 0 : warden.shownOpenness
     pupilScale: warden.pupil
     glow: warden.floating ? 0 : warden.glowLevel
     irisGlow: warden.floating ? 0 : warden.shownIrisGlow
+
+    KnockRipple { visible: !warden.floating && warden.rippleT < 1 }
 
     // Poke it: it flinches.
     MouseArea {
@@ -1303,6 +1615,41 @@ WidgetCard {
           label: "Chase Fast Mouse"
           checked: warden.chaseFastMouse
           onToggled: warden.toggleSetting("chaseFastMouse")
+        }
+
+        MenuToggle {
+          glyph: String.fromCodePoint(0xf075a) // md-music
+          label: "Dance to Music"
+          checked: warden.danceToMusic
+          onToggled: warden.toggleSetting("danceToMusic")
+        }
+
+        MenuToggle {
+          glyph: String.fromCodePoint(0xf0156) // md-close
+          label: "Jump When Windows Close"
+          checked: warden.reactToClosing
+          onToggled: warden.toggleSetting("reactToClosing")
+        }
+
+        MenuToggle {
+          glyph: String.fromCodePoint(0xf009a) // md-bell
+          label: "Read Notifications"
+          checked: warden.watchNotifications
+          onToggled: warden.toggleSetting("watchNotifications")
+        }
+
+        MenuToggle {
+          glyph: String.fromCodePoint(0xf0954) // md-clock
+          label: "Check the Clock"
+          checked: warden.checkClock
+          onToggled: warden.toggleSetting("checkClock")
+        }
+
+        MenuToggle {
+          glyph: String.fromCodePoint(0xf0741) // md-gesture_tap
+          label: "Tap on the Screen"
+          checked: warden.tapScreen
+          onToggled: warden.toggleSetting("tapScreen")
         }
       }
 

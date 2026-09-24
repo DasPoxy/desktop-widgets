@@ -10,6 +10,9 @@
 #                                                        (only while active)
 #   {"type": "windows", "list": [{"x", "y", "w", "h", "title"}, ...]}
 #                                                        (visible windows, on change, only while active)
+#   {"type": "closed", "x": int, "y": int}              (a visible window closed: its last centre,
+#                                                        only while active)
+#   {"type": "notify", "app": str, "summary": str}      (a desktop notification was sent, only while active)
 #
 # Recording = Omarchy's recorder (gpu-screen-recorder), other CLI recorders,
 # or any screen capture going through xdg-desktop-portal (OBS, Discord,
@@ -20,6 +23,9 @@
 #   hl.bind("mouse:272", hl.dsp.event("abyss-click"), { non_consuming = true })
 # which shows up here as "custom>>abyss-click" -- no process per click, and
 # no access to raw input devices needed.
+#
+# Notifications: dbus-monitor watching Notify calls on the session bus
+# (read-only eavesdropping on our own bus; no notification daemon changes).
 #
 # stdin commands: "active 1" / "active 0" -- cursor + window activity are
 # only sampled while the eye is awake, so an idle widget costs one cheap
@@ -48,6 +54,9 @@ CAMERA_NODE = re.compile(r'^(v4l2_|libcamera_|api\.v4l2|api\.libcamera)')
 
 active = False
 out_lock = threading.Lock()
+# address (no 0x) -> last known centre of visible windows, so a closewindow
+# event (the window's already gone by then) still has somewhere to look.
+win_cache = {}
 
 
 def emit(obj):
@@ -152,7 +161,9 @@ def window_centre(address):
         if (c.get('workspace') or {}).get('id') not in visible_ws or c.get('hidden'):
             return None
         (x, y), (w, h) = c.get('at', [0, 0]), c.get('size', [0, 0])
-        return {'x': x + w // 2, 'y': y + h // 2, 'title': c.get('title', '')}
+        centre = {'x': x + w // 2, 'y': y + h // 2, 'title': c.get('title', '')}
+        win_cache[address.replace('0x', '')] = (centre['x'], centre['y'])
+        return centre
     return None
 
 
@@ -184,6 +195,7 @@ def visible_windows():
         (x, y), (w, h) = c.get('at', [0, 0]), c.get('size', [0, 0])
         if w > 40 and h > 40:
             out.append({'x': x, 'y': y, 'w': w, 'h': h, 'title': c.get('title', '')})
+            win_cache[c.get('address', '').replace('0x', '')] = (x + w // 2, y + h // 2)
     return out
 
 
@@ -226,6 +238,11 @@ def event_loop():
                 if name.startswith('monitor'):
                     emit({'type': 'monitors', 'list': monitors()})
                     continue
+                if name == 'closewindow':
+                    pos = win_cache.pop(data.strip().replace('0x', ''), None)
+                    if active and pos:
+                        emit({'type': 'closed', 'x': pos[0], 'y': pos[1]})
+                    continue
                 if not active or name not in ACTIVITY_EVENTS:
                     continue
                 address = data.split(',', 1)[0]
@@ -244,6 +261,45 @@ def event_loop():
         time.sleep(2)
 
 
+def _die_with_parent():
+    # dbus-monitor would otherwise outlive a killed watcher (shell restart)
+    # until the next notification's write hit the closed pipe.
+    try:
+        import ctypes
+        import signal
+        ctypes.CDLL('libc.so.6').prctl(1, signal.SIGTERM)  # PR_SET_PDEATHSIG
+    except Exception:
+        pass
+
+
+def notify_loop():
+    rule = "type='method_call',interface='org.freedesktop.Notifications',member='Notify'"
+    while True:
+        try:
+            p = subprocess.Popen(['dbus-monitor', '--session', rule],
+                                 stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True,
+                                 preexec_fn=_die_with_parent)
+            args = None
+            for line in p.stdout:
+                if line.startswith('method call') and 'member=Notify' in line:
+                    args = []
+                    continue
+                if args is None:
+                    continue
+                m = re.match(r'\s+(string|uint32) "?(.*?)"?$', line)
+                if m:
+                    args.append(m.group(2))
+                # Notify(app_name, replaces_id, app_icon, summary, ...)
+                if len(args) >= 4 or (line.strip() and not m):
+                    if active:
+                        emit({'type': 'notify', 'app': args[0] if args else '',
+                              'summary': args[3] if len(args) > 3 else ''})
+                    args = None
+        except Exception:
+            pass
+        time.sleep(5)
+
+
 def stdin_loop():
     global active
     for line in sys.stdin:
@@ -255,6 +311,6 @@ def stdin_loop():
 
 if __name__ == '__main__':
     emit({'type': 'monitors', 'list': monitors()})
-    for fn in (rec_loop, cursor_loop, event_loop, windows_loop):
+    for fn in (rec_loop, cursor_loop, event_loop, windows_loop, notify_loop):
         threading.Thread(target=fn, daemon=True).start()
     stdin_loop()
