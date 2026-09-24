@@ -40,7 +40,7 @@ WidgetCard {
   property string themeId: "system"
   property bool floating: false
   property bool showCard: false
-  property bool pair: false
+  property string form: "one"   // one | pair | beholder
   property string eyeStyle: "classic"
   property bool examineClicks: true
   property string irisStyle: "auto"
@@ -52,7 +52,8 @@ WidgetCard {
     themeId = getSetting("themeId", "system")
     floating = getSetting("floating", false)
     showCard = getSetting("showCard", false)
-    pair = getSetting("pair", false)
+    // "pair" was a bool before the Beholder existed.
+    form = getSetting("form", getSetting("pair", false) ? "pair" : "one")
     eyeStyle = getSetting("eyeStyle", "classic")
     examineClicks = getSetting("examineClicks", true)
     irisStyle = getSetting("irisStyle", "auto")
@@ -67,10 +68,36 @@ WidgetCard {
     warden[key] = !warden[key]
     warden.saveSetting(key, warden[key])
   }
-  function setPair(v) {
-    warden.pair = v
-    warden.saveSetting("pair", v)
+  function setForm(v) {
+    if (warden.form === v) return
+    warden.form = v
+    warden.saveSetting("form", v)
+    reshapeForForm()
   }
+  // Switching form reshapes the widget around it (same height, width to
+  // suit), so the eyes stay about the same size.
+  readonly property var formAspect: ({ one: 1.65, pair: 2.6, beholder: 1.3 })
+  function reshapeForForm() {
+    var a = formAspect[form] || 1.65
+    setEyeSize(warden.height * a, 1 / a)
+    commitSize()
+  }
+
+  // Eye size = the widget's size (also the floating eyes' size), keeping
+  // its shape. Saved like a resize-handle drag.
+  function setEyeSize(w, aspect) {
+    w = Math.max(warden.minWidth, Math.min(warden.maxWidth, w))
+    warden.width = w
+    warden.height = Math.max(warden.minHeight, Math.min(warden.maxHeight, w * aspect))
+  }
+  function commitSize() {
+    if (!rootRef || !rootRef.saveWidgetPos) return
+    var w = warden.snapVal(warden.width), h = warden.snapVal(warden.height)
+    warden.width = w
+    warden.height = h
+    rootRef.saveWidgetPos(warden.widgetId, warden.targetItem.x, warden.targetItem.y, w, h, warden.monitorName)
+  }
+
   function setIrisStyle(id) {
     warden.irisStyle = id
     warden.saveSetting("irisStyle", id)
@@ -99,7 +126,14 @@ WidgetCard {
     { id: "crosshair", name: "Crosshair" },
     { id: "heart", name: "Heart" },
     { id: "pinpoint", name: "Pinpoint" },
-    { id: "slit", name: "Slit" }
+    { id: "slit", name: "Slit" },
+    { id: "sharingan1", name: "Sharingan I" },
+    { id: "sharingan2", name: "Sharingan II" },
+    { id: "sharingan3", name: "Sharingan III" },
+    { id: "mangekyo", name: "Mangekyō" },
+    { id: "scythe", name: "Mangekyō II" },
+    { id: "rinnegan", name: "Rinnegan" },
+    { id: "byakugan", name: "Byakugan" }
   ]
 
   function setEyeStyle(id) {
@@ -912,7 +946,7 @@ WidgetCard {
         y: warden.floatY
         width: warden.width
         height: warden.height
-        pair: warden.pair
+        form: warden.form
         styleId: warden.eyeStyle
         irisStyle: warden.irisStyle
         theme: warden.theme
@@ -938,7 +972,7 @@ WidgetCard {
     id: cardEye
     anchors.fill: parent
     anchors.margins: 4
-    pair: warden.pair
+    form: warden.form
     styleId: warden.eyeStyle
     irisStyle: warden.irisStyle
     theme: warden.theme
@@ -1181,11 +1215,11 @@ WidgetCard {
         spacing: Style.space(4)
 
         Repeater {
-          model: [{ label: "One Eye", glyph: "󰈈", pair: false }, { label: "Pair", glyph: "󰈈󰈈", pair: true }]
+          model: [{ label: "One", glyph: "󰈈", form: "one" }, { label: "Pair", glyph: "󰈈󰈈", form: "pair" }, { label: "Beholder", glyph: "\uf188", form: "beholder" }]
 
           Rectangle {
             required property var modelData
-            readonly property bool selected: warden.pair === modelData.pair
+            readonly property bool selected: warden.form === modelData.form
             Layout.fillWidth: true
             implicitHeight: 28
             radius: 6
@@ -1207,9 +1241,84 @@ WidgetCard {
               anchors.fill: parent
               hoverEnabled: true
               cursorShape: Qt.PointingHandCursor
-              onClicked: warden.setPair(modelData.pair)
+              onClicked: warden.setForm(modelData.form)
             }
           }
+        }
+      }
+
+      // Eye size: drags the widget's size (= the floating eyes' size),
+      // keeping its shape; saved on release like a resize-handle drag.
+      RowLayout {
+        Layout.fillWidth: true
+        Layout.topMargin: Style.space(2)
+        Layout.leftMargin: Style.space(8)
+        Layout.rightMargin: Style.space(8)
+        spacing: Style.space(8)
+
+        Text {
+          text: "Eye Size"
+          font.family: Style.font.family
+          font.pixelSize: 10
+          color: Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.7)
+        }
+
+        Item {
+          id: sizeTrack
+          Layout.fillWidth: true
+          implicitHeight: 20
+          readonly property real frac: Math.max(0, Math.min(1, (warden.width - warden.minWidth) / Math.max(1, warden.maxWidth - warden.minWidth)))
+
+          Rectangle {
+            anchors.verticalCenter: parent.verticalCenter
+            width: parent.width
+            height: 4
+            radius: 2
+            color: Qt.rgba(1, 1, 1, 0.12)
+          }
+          Rectangle {
+            anchors.verticalCenter: parent.verticalCenter
+            width: parent.width * sizeTrack.frac
+            height: 4
+            radius: 2
+            color: Color.accent
+          }
+          Rectangle {
+            anchors.verticalCenter: parent.verticalCenter
+            x: parent.width * sizeTrack.frac - width / 2
+            width: 14
+            height: 14
+            radius: 7
+            color: sizeMouse.pressed ? Color.foreground : Color.accent
+            border.color: Qt.rgba(0, 0, 0, 0.35)
+            border.width: 1
+          }
+
+          MouseArea {
+            id: sizeMouse
+            anchors.fill: parent
+            cursorShape: Qt.PointingHandCursor
+            property real aspect: 1
+            function apply(mx) {
+              var f = Math.max(0, Math.min(1, mx / width))
+              warden.setEyeSize(warden.minWidth + f * (warden.maxWidth - warden.minWidth), aspect)
+            }
+            onPressed: function(mouse) {
+              aspect = warden.height / Math.max(1, warden.width)
+              apply(mouse.x)
+            }
+            onPositionChanged: function(mouse) { if (pressed) apply(mouse.x) }
+            onReleased: warden.commitSize()
+          }
+        }
+
+        Text {
+          Layout.preferredWidth: 42
+          horizontalAlignment: Text.AlignRight
+          text: Math.round(warden.width) + "px"
+          font.family: Style.font.family
+          font.pixelSize: 10
+          color: Color.accent
         }
       }
 

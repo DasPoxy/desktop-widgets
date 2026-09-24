@@ -41,6 +41,18 @@ Canvas {
   onThemeChanged: requestPaint()
   onStyleIdChanged: requestPaint()
   onIrisStyleChanged: requestPaint()
+
+  // Slow rotation for the spinning irises (Sharingan/Mangekyō); only ticks
+  // while one is shown and the eye is open.
+  property real spinAngle: 0
+  readonly property real spinSpeed: (irisStyles[irisStyle] && irisStyles[irisStyle].spin) || 0
+  FrameAnimation {
+    running: eye.spinSpeed > 0 && eye.visible && eye.openness > 0.05
+    onTriggered: {
+      eye.spinAngle = (eye.spinAngle + frameTime * eye.spinSpeed) % (Math.PI * 2)
+      eye.requestPaint()
+    }
+  }
   onMirroredChanged: requestPaint()
   onWidthChanged: requestPaint()
   onHeightChanged: requestPaint()
@@ -106,7 +118,17 @@ Canvas {
     crosshair: { pattern: "crosshair", pupil: "round", pupilR: 0.16, highlight: "soft" },
     heart: { pattern: "cel", pupil: "heart", pupilR: 0.5, highlight: "classic" },
     pinpoint: { pattern: "pinpoint", pupil: "round", pupilR: 0.17, highlight: "soft" },
-    slit: { pattern: "cel", pupil: "slit", pupilR: 0.2, highlight: "classic" }
+    slit: { pattern: "cel", pupil: "slit", pupilR: 0.2, highlight: "classic" },
+    // Naruto dojutsu. These keep their signature colours whatever the theme
+    // (`colors` overrides the theme's iris/irisDark/irisLight/pupil); `spin`
+    // is a slow rotation in rad/s.
+    sharingan1: { pattern: "tomoe", tomoe: 1, pupil: "round", pupilR: 0.17, highlight: "soft", spin: 0.7, colors: { iris: "#d1172e", irisDark: "#5e0612", irisLight: "#ff6b6b", pupil: "#0d0406" } },
+    sharingan2: { pattern: "tomoe", tomoe: 2, pupil: "round", pupilR: 0.17, highlight: "soft", spin: 0.7, colors: { iris: "#d1172e", irisDark: "#5e0612", irisLight: "#ff6b6b", pupil: "#0d0406" } },
+    sharingan3: { pattern: "tomoe", tomoe: 3, pupil: "round", pupilR: 0.17, highlight: "soft", spin: 0.7, colors: { iris: "#d1172e", irisDark: "#5e0612", irisLight: "#ff6b6b", pupil: "#0d0406" } },
+    mangekyo: { pattern: "pinwheel", pupil: "none", pupilR: 0.22, highlight: "soft", spin: 0.35, colors: { iris: "#cc1530", irisDark: "#5e0612", irisLight: "#ff6b6b", pupil: "#0d0406" } },
+    scythe: { pattern: "scythe", pupil: "round", pupilR: 0.14, highlight: "soft", spin: 0.35, colors: { iris: "#cc1530", irisDark: "#5e0612", irisLight: "#ff6b6b", pupil: "#0d0406" } },
+    rinnegan: { pattern: "rinnegan", pupil: "round", pupilR: 0.08, highlight: "tiny", colors: { iris: "#b7a3dd", irisDark: "#3f2f66", irisLight: "#e3d8f7", pupil: "#2a1f47" } },
+    byakugan: { pattern: "byakugan", pupil: "none", pupilR: 0, highlight: "none", veins: true, colors: { iris: "#ece9f6", irisDark: "#aaa3cc", irisLight: "#ffffff", pupil: "#ece9f6" } }
   })
 
   function col(key, fallback) {
@@ -269,14 +291,15 @@ Canvas {
 
     ctx.beginPath()
     ctx.arc(0, 0, R, 0, Math.PI * 2)
-    ctx.fillStyle = col("iris", "#e8456b")
+    var ic = irs.colors || {}
+    ctx.fillStyle = ic.iris || col("iris", "#e8456b")
     ctx.fill()
 
     // Shading shapes are built to stay inside the iris circle rather than
     // clipped to it: Canvas clip() replaces the current clip instead of
     // intersecting, and restoring a nested clip drops the eye-shape clip.
-    var irisDark = col("irisDark", "#8c1f3f")
-    var irisLight = col("irisLight", "#ffb3a7")
+    var irisDark = ic.irisDark || col("irisDark", "#8c1f3f")
+    var irisLight = ic.irisLight || col("irisLight", "#ffb3a7")
     function ring(r, w, color) {
       ctx.strokeStyle = color
       ctx.lineWidth = w
@@ -326,6 +349,7 @@ Canvas {
       }
     }
 
+    function polar(r, a) { return [Math.cos(a) * r, Math.sin(a) * r] }
     var pat = irs.pattern
     if (pat === "cel") {
       cap(true); crescent(1); flecks()
@@ -384,12 +408,72 @@ Canvas {
       crescent(1)
       ring(R * 0.45, R * 0.06, lash)
       ring(R * 0.78, R * 0.025, rgba(lash, 0.7))
+    } else if (pat === "tomoe") {
+      // Sharingan: a thin ring with 1-3 comma-shaped tomoe riding on it.
+      crescent(0.35)
+      var rr = R * 0.56, hr = R * 0.13
+      ring(rr, R * 0.035, rgba(irisDark, 0.9))
+      ctx.fillStyle = ic.pupil || lash
+      for (var tk = 0; tk < irs.tomoe; tk++) {
+        var ta = spinAngle + tk * Math.PI * 2 / irs.tomoe - Math.PI / 2
+        var hx = Math.cos(ta) * rr, hy = Math.sin(ta) * rr
+        ctx.beginPath()
+        ctx.arc(hx, hy, hr, 0, Math.PI * 2)
+        ctx.fill()
+        // Tail sweeps back along the ring, tapering to a point.
+        var tipA = ta - 0.62, midA = ta - 0.3
+        ctx.beginPath()
+        ctx.moveTo(hx + Math.cos(ta) * hr, hy + Math.sin(ta) * hr)
+        ctx.quadraticCurveTo(Math.cos(midA) * rr * 1.2, Math.sin(midA) * rr * 1.2, Math.cos(tipA) * rr * 1.04, Math.sin(tipA) * rr * 1.04)
+        ctx.quadraticCurveTo(Math.cos(midA) * rr * 0.98, Math.sin(midA) * rr * 0.98, hx - Math.cos(ta) * hr * 0.35, hy - Math.sin(ta) * hr * 0.35)
+        ctx.closePath()
+        ctx.fill()
+      }
+    } else if (pat === "pinwheel") {
+      // Mangekyō: a black core with three broad curved blades.
+      crescent(0.35)
+      ctx.fillStyle = ic.pupil || lash
+      ctx.beginPath()
+      ctx.arc(0, 0, R * 0.24, 0, Math.PI * 2)
+      ctx.fill()
+      for (var pw2 = 0; pw2 < 3; pw2++) {
+        var pa = spinAngle + pw2 * Math.PI * 2 / 3
+        var p0 = polar(R * 0.2, pa - 0.55), c1 = polar(R * 0.78, pa - 0.25), tip = polar(R * 0.9, pa + 0.42), c2 = polar(R * 0.46, pa + 0.62), p1 = polar(R * 0.2, pa + 0.75)
+        ctx.beginPath()
+        ctx.moveTo(p0[0], p0[1])
+        ctx.quadraticCurveTo(c1[0], c1[1], tip[0], tip[1])
+        ctx.quadraticCurveTo(c2[0], c2[1], p1[0], p1[1])
+        ctx.closePath()
+        ctx.fill()
+      }
+    } else if (pat === "scythe") {
+      // Mangekyō: three thin scythes sweeping out from a ring.
+      crescent(0.35)
+      ring(R * 0.3, R * 0.05, ic.pupil || lash)
+      ctx.fillStyle = ic.pupil || lash
+      for (var sc = 0; sc < 3; sc++) {
+        var sa = spinAngle + sc * Math.PI * 2 / 3
+        var s0 = polar(R * 0.28, sa - 0.18), sc1 = polar(R * 0.75, sa + 0.15), stip = polar(R * 0.93, sa + 1.05), sc2 = polar(R * 0.62, sa + 0.3), s1 = polar(R * 0.28, sa + 0.22)
+        ctx.beginPath()
+        ctx.moveTo(s0[0], s0[1])
+        ctx.quadraticCurveTo(sc1[0], sc1[1], stip[0], stip[1])
+        ctx.quadraticCurveTo(sc2[0], sc2[1], s1[0], s1[1])
+        ctx.closePath()
+        ctx.fill()
+      }
+    } else if (pat === "rinnegan") {
+      // Rippled rings, evenly spaced out from a small pupil.
+      for (var rg = 1; rg <= 4; rg++) ring(R * (0.18 + 0.19 * rg), R * 0.04, irisDark)
+    } else if (pat === "byakugan") {
+      // Near-white and pupil-less: just faint rings.
+      ring(R * 0.62, R * 0.03, rgba(irisDark, 0.45))
+      ring(R * 0.9, R * 0.02, rgba(irisDark, 0.35))
     }
 
     // Pupil.
     var ps = Math.max(0.5, Math.min(1.5, pupilScale))
     var pr = R * (irs.pupilR || 0.4) * ps
-    ctx.fillStyle = col("pupil", "#1c1f3f")
+    ctx.fillStyle = ic.pupil || col("pupil", "#1c1f3f")
     ctx.beginPath()
     if (pupilShape === "slit") {
       var pw = R * 0.2 * ps, ph = R * 1.5
@@ -531,6 +615,24 @@ Canvas {
         ctx.moveTo(lp[0], lp[1])
         ctx.lineTo(lp[0] + 0.018, lp[1] + 0.065 * o)
         ctx.stroke()
+      }
+    }
+
+    // Byakugan: bulging veins at the corners of the eye.
+    if (irs.veins && o > 0.2) {
+      ctx.strokeStyle = rgba(lash, 0.55 * o)
+      ctx.lineWidth = 0.012
+      ctx.lineCap = "round"
+      var vs = [[Lx - 0.01, Ly, -1], [Rx + 0.01, Ry, 1]]
+      for (var vi = 0; vi < 2; vi++) {
+        var vx = vs[vi][0], vy = vs[vi][1], vd = vs[vi][2]
+        for (var vb = 0; vb < 3; vb++) {
+          var va = (-0.55 + vb * 0.5)
+          ctx.beginPath()
+          ctx.moveTo(vx, vy)
+          ctx.quadraticCurveTo(vx + vd * 0.05, vy + va * 0.05, vx + vd * 0.1, vy + va * 0.12 - 0.02)
+          ctx.stroke()
+        }
       }
     }
 
