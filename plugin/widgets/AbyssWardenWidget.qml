@@ -13,7 +13,8 @@ import qs.Ui
 // between the mouse, windows whose contents change, random spots, and
 // staring straight out at the viewer, and blinks now and then.
 // Lives in its card by default; Free-Floating mode lets it drift around the
-// screen instead (click-through overlay, sized like the card).
+// screen instead (click-through overlay, sized like the card). One eye or a
+// pair, in any of the AbyssEye styles.
 // ---------------------------------------------------------------------------
 WidgetCard {
   id: warden
@@ -39,11 +40,15 @@ WidgetCard {
   property string themeId: "system"
   property bool floating: false
   property bool showCard: false
+  property bool pair: false
+  property string eyeStyle: "classic"
 
   function applySavedSettings() {
     themeId = getSetting("themeId", "system")
     floating = getSetting("floating", false)
     showCard = getSetting("showCard", false)
+    pair = getSetting("pair", false)
+    eyeStyle = getSetting("eyeStyle", "classic")
   }
   onSettingsLoaded: applySavedSettings()
   onRootRefChanged: applySavedSettings()
@@ -53,6 +58,28 @@ WidgetCard {
     warden[key] = !warden[key]
     warden.saveSetting(key, warden[key])
   }
+  function setPair(v) {
+    warden.pair = v
+    warden.saveSetting("pair", v)
+  }
+  function setEyeStyle(id) {
+    warden.eyeStyle = id
+    warden.saveSetting("eyeStyle", id)
+  }
+
+  // Shapes live in AbyssEye.qml; these are the menu names, in menu order.
+  readonly property var eyeStyles: [
+    { id: "classic", name: "Classic" },
+    { id: "sparkle", name: "Sparkle" },
+    { id: "starry", name: "Starry" },
+    { id: "sharp", name: "Sharp" },
+    { id: "glare", name: "Glare" },
+    { id: "shocked", name: "Shocked" },
+    { id: "hypnotic", name: "Hypnotic" },
+    { id: "shoujo", name: "Shoujo" },
+    { id: "angular", name: "Angular" }
+  ]
+
   function setTheme(id) {
     warden.themeId = id
     warden.saveSetting("themeId", id)
@@ -466,11 +493,13 @@ WidgetCard {
       WlrLayershell.keyboardFocus: WlrKeyboardFocus.None
       mask: Region {}
 
-      AbyssEye {
+      AbyssEyes {
         x: warden.floatX
         y: warden.floatY
         width: warden.width
         height: warden.height
+        pair: warden.pair
+        styleId: warden.eyeStyle
         theme: warden.theme
         gazeX: warden.gazeX
         gazeY: warden.gazeY
@@ -490,10 +519,12 @@ WidgetCard {
   opacity: cardShown ? 1.0 : 0.0
   Behavior on opacity { NumberAnimation { duration: 500; easing.type: Easing.InOutQuad } }
 
-  AbyssEye {
+  AbyssEyes {
     id: cardEye
     anchors.fill: parent
     anchors.margins: 4
+    pair: warden.pair
+    styleId: warden.eyeStyle
     theme: warden.theme
     gazeX: warden.floating ? 0 : warden.gazeX
     gazeY: warden.floating ? 0 : warden.gazeY
@@ -648,6 +679,122 @@ WidgetCard {
         label: "Card Background"
         checked: warden.showCard
         onToggled: warden.toggleSetting("showCard")
+      }
+
+      Text {
+        Layout.fillWidth: true
+        Layout.leftMargin: Style.space(8)
+        Layout.topMargin: Style.space(4)
+        text: "EYES"
+        font.family: Style.font.family
+        font.pixelSize: 9
+        font.weight: Font.Bold
+        color: Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.45)
+      }
+
+      // One eye | a pair.
+      RowLayout {
+        Layout.fillWidth: true
+        Layout.leftMargin: Style.space(4)
+        Layout.rightMargin: Style.space(4)
+        spacing: Style.space(4)
+
+        Repeater {
+          model: [{ label: "One Eye", glyph: "󰈈", pair: false }, { label: "Pair", glyph: "󰈈󰈈", pair: true }]
+
+          Rectangle {
+            required property var modelData
+            readonly property bool selected: warden.pair === modelData.pair
+            Layout.fillWidth: true
+            implicitHeight: 28
+            radius: 6
+            color: selected ? Qt.rgba(Color.accent.r, Color.accent.g, Color.accent.b, 0.22)
+              : (countMouse.containsMouse ? Qt.rgba(1, 1, 1, 0.06) : "transparent")
+            border.color: selected ? Color.accent : Qt.rgba(1, 1, 1, 0.1)
+            border.width: 1
+
+            Text {
+              anchors.centerIn: parent
+              text: modelData.glyph + "  " + modelData.label
+              font.family: Style.font.family
+              font.pixelSize: 10
+              color: parent.selected ? Color.accent : Color.foreground
+            }
+
+            MouseArea {
+              id: countMouse
+              anchors.fill: parent
+              hoverEnabled: true
+              cursorShape: Qt.PointingHandCursor
+              onClicked: warden.setPair(modelData.pair)
+            }
+          }
+        }
+      }
+
+      Text {
+        Layout.fillWidth: true
+        Layout.leftMargin: Style.space(8)
+        Layout.topMargin: Style.space(4)
+        text: "EYE STYLE"
+        font.family: Style.font.family
+        font.pixelSize: 9
+        font.weight: Font.Bold
+        color: Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.45)
+      }
+
+      // Each chip previews its shape in the current theme.
+      GridLayout {
+        Layout.fillWidth: true
+        Layout.leftMargin: Style.space(4)
+        Layout.rightMargin: Style.space(4)
+        columns: 3
+        columnSpacing: Style.space(4)
+        rowSpacing: Style.space(4)
+
+        Repeater {
+          model: warden.eyeStyles
+
+          Rectangle {
+            required property var modelData
+            readonly property bool selected: warden.eyeStyle === modelData.id
+            Layout.fillWidth: true
+            implicitHeight: 50
+            radius: 6
+            color: selected ? Qt.rgba(Color.accent.r, Color.accent.g, Color.accent.b, 0.22)
+              : (styleMouse.containsMouse ? Qt.rgba(1, 1, 1, 0.06) : "transparent")
+            border.color: selected ? Color.accent : "transparent"
+            border.width: 1
+
+            AbyssEye {
+              anchors.top: parent.top
+              anchors.topMargin: 3
+              anchors.horizontalCenter: parent.horizontalCenter
+              width: parent.width - 8
+              height: 30
+              styleId: modelData.id
+              theme: warden.theme
+              glow: 0
+            }
+            Text {
+              anchors.bottom: parent.bottom
+              anchors.bottomMargin: 3
+              anchors.horizontalCenter: parent.horizontalCenter
+              text: modelData.name
+              font.family: Style.font.family
+              font.pixelSize: 9
+              color: parent.selected ? Color.accent : Color.foreground
+            }
+
+            MouseArea {
+              id: styleMouse
+              anchors.fill: parent
+              hoverEnabled: true
+              cursorShape: Qt.PointingHandCursor
+              onClicked: warden.setEyeStyle(modelData.id)
+            }
+          }
+        }
       }
 
       Text {
