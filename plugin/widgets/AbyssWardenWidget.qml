@@ -43,6 +43,9 @@ WidgetCard {
   property string form: "one"   // one | pair | beholder
   property string eyeStyle: "classic"
   property bool examineClicks: true
+  // Buddy Mode: stay out all the time instead of only while recording; a
+  // recording makes the irises glow instead of summoning the eyes.
+  property bool buddyMode: false
   property string irisStyle: "auto"
   // Which menu sections are expanded, e.g. { style: true }. All start folded.
   property var openSections: ({})
@@ -56,6 +59,7 @@ WidgetCard {
     form = getSetting("form", getSetting("pair", false) ? "pair" : "one")
     eyeStyle = getSetting("eyeStyle", "classic")
     examineClicks = getSetting("examineClicks", true)
+    buddyMode = getSetting("buddyMode", false)
     irisStyle = getSetting("irisStyle", "auto")
     themeColors = getSetting("themeColors", true)
     openSections = getSetting("openSections", {})
@@ -222,7 +226,24 @@ WidgetCard {
   property bool recording: false
   property var recSources: []
   property bool previewing: false
-  readonly property bool awake: recording || previewing
+  readonly property bool awake: recording || previewing || buddyMode
+
+  // Buddy Mode recording glow: fades in when a recording starts (or during
+  // a preview), with a slow pulse; glowPhase advances in tick().
+  readonly property bool glowing: buddyMode && (recording || previewing)
+  property real irisGlowLevel: glowing ? 1 : 0
+  Behavior on irisGlowLevel { NumberAnimation { duration: 900; easing.type: Easing.InOutQuad } }
+  property real glowPhase: 0
+  readonly property real shownIrisGlow: irisGlowLevel * (0.86 + 0.14 * Math.sin(glowPhase * 2.6))
+
+  // A recording starting while the buddy's already out: a startled blink
+  // and a pupil twitch as the glow comes on.
+  onRecordingChanged: {
+    if (buddyMode && recording && openness > 0.5) {
+      pupil = 0.6
+      blink()
+    }
+  }
   readonly property bool editing: !!(rootRef && rootRef.layoutEditMode)
 
   property var monitorsMap: ({})
@@ -767,6 +788,7 @@ WidgetCard {
       gazeY += gazeVY * h
     }
     pupil += (pupilTarget - pupil) * (1 - Math.exp(-dt * 5))
+    if (irisGlowLevel > 0) glowPhase += dt
     if (floating) stepFloat(dt)
   }
 
@@ -963,6 +985,7 @@ WidgetCard {
         openness: warden.shownOpenness
         pupilScale: warden.pupil
         glow: warden.glowLevel
+        irisGlow: warden.shownIrisGlow
       }
     }
   }
@@ -989,6 +1012,7 @@ WidgetCard {
     openness: warden.floating ? 0 : warden.shownOpenness
     pupilScale: warden.pupil
     glow: warden.floating ? 0 : warden.glowLevel
+    irisGlow: warden.floating ? 0 : warden.shownIrisGlow
 
     // Poke it: it flinches.
     MouseArea {
@@ -1125,8 +1149,10 @@ WidgetCard {
         Layout.rightMargin: Style.space(8)
         wrapMode: Text.WordWrap
         text: warden.recording
-          ? "󰑊  Watching · " + warden.recSources.join(", ")
-          : (warden.previewing ? "󰈈  Preview · wide awake for 15s" : "󰒲  Asleep · appears only while the screen is recorded")
+          ? "󰑊  Watching · " + warden.recSources.join(", ") + (warden.buddyMode ? " · irises glowing" : "")
+          : (warden.buddyMode
+            ? (warden.previewing ? "\uf004  Buddy · previewing the recording glow" : "\uf004  Buddy · hanging out; irises glow while recording")
+            : (warden.previewing ? "󰈈  Preview · wide awake for 15s" : "󰒲  Asleep · appears only while the screen is recorded"))
         font.family: Style.font.family
         font.pixelSize: 10
         color: warden.recording ? Color.accent : Qt.rgba(Color.foreground.r, Color.foreground.g, Color.foreground.b, 0.6)
@@ -1152,7 +1178,9 @@ WidgetCard {
           }
           Text {
             Layout.fillWidth: true
-            text: warden.previewing ? "Put It Back to Sleep" : "Wake It Up (15s preview)"
+            text: warden.buddyMode
+              ? (warden.previewing ? "Stop Glow Preview" : "Preview Recording Glow (15s)")
+              : (warden.previewing ? "Put It Back to Sleep" : "Wake It Up (15s preview)")
             font.family: Style.font.family
             font.pixelSize: 11
             color: Color.foreground
@@ -1181,6 +1209,13 @@ WidgetCard {
         label: "Free-Floating Mode"
         checked: warden.floating
         onToggled: warden.toggleSetting("floating")
+      }
+
+      MenuToggle {
+        glyph: "\uf004"
+        label: "Buddy Mode (always out)"
+        checked: warden.buddyMode
+        onToggled: warden.toggleSetting("buddyMode")
       }
 
       MenuToggle {

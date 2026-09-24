@@ -26,6 +26,8 @@ Canvas {
   property real pupilScale: 1
   // Print-offset strength 0..1 (0 while asleep).
   property real glow: 1
+  // Iris glow 0..1 (Buddy Mode: the irises light up while recording).
+  property real irisGlow: 0
   // { sclera, scleraShade, irisDark, iris, irisLight, pupil, highlight, lash, glow, slit }
   property var theme: ({})
   property string styleId: "classic"
@@ -38,6 +40,7 @@ Canvas {
   onOpennessChanged: requestPaint()
   onPupilScaleChanged: requestPaint()
   onGlowChanged: requestPaint()
+  onIrisGlowChanged: requestPaint()
   onThemeChanged: requestPaint()
   onStyleIdChanged: requestPaint()
   onIrisStyleChanged: requestPaint()
@@ -470,6 +473,23 @@ Canvas {
       ring(R * 0.9, R * 0.02, rgba(irisDark, 0.35))
     }
 
+    // Buddy Mode recording glow, part one: the iris lights up from within in
+    // its own hue (drawn before the pupil so the pupil stays dark) and its
+    // inner ring burns bright.
+    var ig2 = Math.max(0, Math.min(1, irisGlow))
+    var irisBase = ic.iris || col("iris", "#e8456b")
+    if (ig2 > 0.01) {
+      ctx.save()
+      ctx.globalCompositeOperation = "lighter"
+      ctx.fillStyle = rgba(Qt.lighter(irisBase, 1.3), 0.6 * ig2)
+      ctx.beginPath()
+      ctx.arc(0, 0, R, 0, Math.PI * 2)
+      ctx.fill()
+      ctx.restore()
+      ring(R * 0.62, R * 0.08, rgba(irisLight, 0.75 * ig2))
+      ring(R * 0.62, R * 0.03, rgba(col("highlight", "#fff7ea"), 0.9 * ig2))
+    }
+
     // Pupil.
     var ps = Math.max(0.5, Math.min(1.5, pupilScale))
     var pr = R * (irs.pupilR || 0.4) * ps
@@ -492,8 +512,16 @@ Canvas {
       ctx.fill()
     }
 
-    // Iris outline.
-    ring(R * 0.97, R * 0.085, lash)
+    // Glow, part two: coloured light spilling off the rim onto the white,
+    // as flat bands that fade outward (the riso take on a glow; Canvas
+    // shadowBlur doesn't render on these strokes anyway).
+    if (ig2 > 0.01) {
+      for (var gb = 1; gb <= 5; gb++)
+        ring(R * (0.98 + 0.15 * gb), R * 0.16, rgba(irisBase, 0.62 * (1 - gb / 6) * ig2))
+    }
+
+    // Iris outline (softened while glowing).
+    ring(R * 0.97, R * 0.085, ig2 > 0.01 ? rgba(lash, 1 - 0.5 * ig2) : lash)
     ctx.restore()
 
     // Highlights: flat, hard-edged, riding along with the iris.

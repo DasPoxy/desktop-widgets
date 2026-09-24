@@ -18,6 +18,7 @@ Item {
   property real openness: 1
   property real pupilScale: 1
   property real glow: 1
+  property real irisGlow: 0
 
   AbyssEye {
     visible: eyes.pair
@@ -32,6 +33,7 @@ Item {
     gazeY: eyes.gazeY
     openness: eyes.openness
     pupilScale: eyes.pupilScale
+    irisGlow: eyes.irisGlow
     glow: eyes.glow
   }
 
@@ -47,6 +49,7 @@ Item {
     gazeY: eyes.gazeY
     openness: eyes.openness
     pupilScale: eyes.pupilScale
+    irisGlow: eyes.irisGlow
     glow: eyes.glow
   }
 
@@ -60,6 +63,7 @@ Item {
     gazeY: eyes.gazeY
     openness: eyes.openness
     pupilScale: eyes.pupilScale
+    irisGlow: eyes.irisGlow
     glow: eyes.glow
   }
 }

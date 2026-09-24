@@ -18,6 +18,7 @@ Item {
   property real openness: 1
   property real pupilScale: 1
   property real glow: 1
+  property real irisGlow: 0
 
   // Seconds of animation time: drives the stalk sway and the little eyes'
   // own wandering. Only ticks while awake.
@@ -164,6 +165,7 @@ Item {
     gazeY: beholder.gazeY
     openness: beholder.openness
     pupilScale: beholder.pupilScale
+    irisGlow: beholder.irisGlow
     glow: beholder.glow
   }
 
@@ -186,6 +188,7 @@ Item {
       gazeY: Math.max(-1, Math.min(1, beholder.gazeY + Math.cos(beholder.t * 0.7 + index * 1.3) * 0.3))
       openness: beholder.openness
       pupilScale: beholder.pupilScale
+      irisGlow: beholder.irisGlow
       glow: 0
     }
   }
