@@ -65,9 +65,9 @@ The big clock behind Abyss Warden in [these shots](#abyss-warden).
 ### Abyss Warden
 
 <p>
- | <img src="screenshots/abyss-warden/beholder.png" width="360" alt="Abyss Warden as a Beholder"> |
-    | <img src="screenshots/abyss-warden/pair.png" width="360" alt="Abyss Warden pair, floating"> |
-  | <img src="screenshots/abyss-warden/options.png" width="240" alt="Abyss Warden options"> |
+ <img src="screenshots/abyss-warden/beholder.png" width="360" alt="Abyss Warden as a Beholder">
+    <img src="screenshots/abyss-warden/pair.png" width="360" alt="Abyss Warden pair, floating">
+  <img src="screenshots/abyss-warden/options.png" width="240" alt="Abyss Warden options">
 </p>
 
 ### System Monitor
