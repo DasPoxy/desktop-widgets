@@ -185,6 +185,15 @@ QtObject {
       componentUrl: Qt.resolvedUrl("RealmPortalWidget.qml")
     },
     {
+      id: "abyss_warden",
+      name: "Abyss Warden",
+      category: "Fun",
+      icon: "󰈈",
+      badge: "Watcher",
+      description: "An anime eye that only appears while your screen is being recorded (Omarchy recorder, OBS, screen shares). It follows the mouse, glances at windows that change, and blinks. Can float freely around the screen; 7 eye themes or your system theme.",
+      componentUrl: Qt.resolvedUrl("AbyssWardenWidget.qml")
+    },
+    {
       id: "system_about",
       name: "About This System",
       category: "System",

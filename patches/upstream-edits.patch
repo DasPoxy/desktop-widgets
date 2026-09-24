@@ -1,5 +1,5 @@
 diff --git a/widgets/WidgetRegistry.qml b/widgets/WidgetRegistry.qml
-index 54e7986..ab23997 100644
+index 54e7986..0a8f675 100644
 --- a/widgets/WidgetRegistry.qml
 +++ b/widgets/WidgetRegistry.qml
 @@ -13,6 +13,15 @@ QtObject {
@@ -18,7 +18,7 @@ index 54e7986..ab23997 100644
      {
        id: "gallery",
        name: "3D Photo Deck Stack",
-@@ -147,6 +156,60 @@ QtObject {
+@@ -147,6 +156,69 @@ QtObject {
        badge: "Live Feeds",
        description: "News and article reader with customizable RSS/Atom feeds, channel tabs, and browser integration.",
        componentUrl: Qt.resolvedUrl("rss-feed/RssFeedWidget.qml")
@@ -49,6 +49,15 @@ index 54e7986..ab23997 100644
 +      badge: "Custom",
 +      description: "One button: picks a random installed game from Steam, Heroic, or Lutris and launches it.",
 +      componentUrl: Qt.resolvedUrl("RealmPortalWidget.qml")
++    },
++    {
++      id: "abyss_warden",
++      name: "Abyss Warden",
++      category: "Fun",
++      icon: "󰈈",
++      badge: "Watcher",
++      description: "An anime eye that only appears while your screen is being recorded (Omarchy recorder, OBS, screen shares). It follows the mouse, glances at windows that change, and blinks. Can float freely around the screen; 7 eye themes or your system theme.",
++      componentUrl: Qt.resolvedUrl("AbyssWardenWidget.qml")
 +    },
 +    {
 +      id: "system_about",
