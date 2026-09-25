@@ -1,5 +1,5 @@
 diff --git a/DesktopWidgets.qml b/DesktopWidgets.qml
-index b3d8e0f..a72aa0c 100644
+index b3d8e0f..d4cd081 100644
 --- a/DesktopWidgets.qml
 +++ b/DesktopWidgets.qml
 @@ -30,6 +30,8 @@ Item {
@@ -71,6 +71,32 @@ index b3d8e0f..a72aa0c 100644
  
                property real defaultX: item && item.defaultX !== undefined ? item.defaultX : Style.space(24)
                property real defaultY: item && item.defaultY !== undefined ? item.defaultY : Style.space(64)
+@@ -1267,10 +1292,23 @@ Item {
+               readonly property real targetY: (desktopWindow.height > 0) ? Math.max(10, Math.min(maxY, rawY)) : rawY
+ 
+               onTargetXChanged: {
+-                if (!widgetLoader.isDragging) widgetLoader.x = targetX
++                if (!widgetLoader.isDragging && !widgetLoader.soloCentered) widgetLoader.x = targetX
+               }
+               onTargetYChanged: {
+-                if (!widgetLoader.isDragging) widgetLoader.y = targetY
++                if (!widgetLoader.isDragging && !widgetLoader.soloCentered) widgetLoader.y = targetY
++              }
++
++              // Summoned alone: slide to screen centre (not saved), then back to the saved spot on close
++              readonly property bool soloCentered: root.soloWidgetId === modelData.id
++              onSoloCenteredChanged: {
++                if (widgetLoader.isDragging) return
++                if (soloCentered) {
++                  widgetLoader.x = Math.max(10, (desktopWindow.width - effectiveWidth) / 2)
++                  widgetLoader.y = Math.max(10, (desktopWindow.height - effectiveHeight) / 2)
++                } else {
++                  widgetLoader.x = targetX
++                  widgetLoader.y = targetY
++                }
+               }
+               onSavedWidthChanged: {
+                 if (savedWidth > 0 && item && item.resizable && !item.isResizing) {
 diff --git a/components/WidgetSelector.qml b/components/WidgetSelector.qml
 index 6e42279..8b6cf6d 100644
 --- a/components/WidgetSelector.qml

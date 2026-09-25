@@ -41,8 +41,9 @@ Edits to upstream files (in `patches/upstream-edits.patch`, full copies in
 - `widgets/quick-notes/QuickNotesWidget.qml` reloads live when `notes.json`
   changes on disk.
 - `DesktopWidgets.qml` adds a `summon <widget-id>` IPC call that raises one
-  widget alone above all windows (Esc, a click outside it, or the same call
-  again closes it). Quick Notes puts the cursor in its input when summoned.
+  widget alone, centred, above all windows (Esc, a click outside it, or the same call
+  again sends it back to its saved spot). Quick Notes puts the cursor in its
+  input when summoned.
   Bind it in `~/.config/hypr/bindings.lua`:
   `o.bind("SUPER + CTRL + ALT + RETURN", "Quick Notes", "omarchy-shell -q dagyr.desktop-widgets summon quick_notes")`
 - `manage-positions.sh`, `get-photos.sh`, `get-network.sh` save the state file

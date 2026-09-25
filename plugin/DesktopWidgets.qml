@@ -1292,10 +1292,23 @@ Item {
               readonly property real targetY: (desktopWindow.height > 0) ? Math.max(10, Math.min(maxY, rawY)) : rawY
 
               onTargetXChanged: {
-                if (!widgetLoader.isDragging) widgetLoader.x = targetX
+                if (!widgetLoader.isDragging && !widgetLoader.soloCentered) widgetLoader.x = targetX
               }
               onTargetYChanged: {
-                if (!widgetLoader.isDragging) widgetLoader.y = targetY
+                if (!widgetLoader.isDragging && !widgetLoader.soloCentered) widgetLoader.y = targetY
+              }
+
+              // Summoned alone: slide to screen centre (not saved), then back to the saved spot on close
+              readonly property bool soloCentered: root.soloWidgetId === modelData.id
+              onSoloCenteredChanged: {
+                if (widgetLoader.isDragging) return
+                if (soloCentered) {
+                  widgetLoader.x = Math.max(10, (desktopWindow.width - effectiveWidth) / 2)
+                  widgetLoader.y = Math.max(10, (desktopWindow.height - effectiveHeight) / 2)
+                } else {
+                  widgetLoader.x = targetX
+                  widgetLoader.y = targetY
+                }
               }
               onSavedWidthChanged: {
                 if (savedWidth > 0 && item && item.resizable && !item.isResizing) {
