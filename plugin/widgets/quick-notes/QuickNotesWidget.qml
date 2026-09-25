@@ -70,6 +70,17 @@ WidgetCard {
     }
   }
 
+  // Summoned alone via the keybind (IPC summon): drop the cursor into the active tab's input
+  Connections {
+    target: (rootRef && "soloWidgetId" in rootRef) ? rootRef : null
+    ignoreUnknownSignals: true
+    function onSoloWidgetIdChanged() {
+      if (rootRef.soloWidgetId !== notesWidgetRoot.widgetId) return
+      if (notesWidgetRoot.currentTab === "SCRATCHPAD") scratchpadEdit.forceActiveFocus()
+      else if (notesWidgetRoot.currentTab === "TASKS") taskInput.forceActiveFocus()
+    }
+  }
+
   Component.onDestruction: {
     if (rootRef && "keyboardFocusRequested" in rootRef && rootRef.keyboardFocusRequested) {
       rootRef.keyboardFocusRequested = false

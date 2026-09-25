@@ -1,3 +1,76 @@
+diff --git a/DesktopWidgets.qml b/DesktopWidgets.qml
+index b3d8e0f..a72aa0c 100644
+--- a/DesktopWidgets.qml
++++ b/DesktopWidgets.qml
+@@ -30,6 +30,8 @@ Item {
+   property bool presetsSubmenuOpen: false
+   property bool manualHide: false
+   property bool overlayActive: false
++  // Widget id raised alone by summonWidget(); "" = normal overlay (all widgets)
++  property string soloWidgetId: ""
+   property bool keyboardFocusRequested: false
+   readonly property string autoHideMode: (root.appearance && root.appearance.auto_hide_mode) ? root.appearance.auto_hide_mode : "tiled"
+   property bool menuOpenRequested: false
+@@ -94,6 +96,10 @@ Item {
+ 
+   function closeOverlay() {
+     overlayActive = false
++    if (root.soloWidgetId !== "") {
++      root.soloWidgetId = ""
++      root.keyboardFocusRequested = false
++    }
+     if (root.autoHideMode === "manual" && root.wasManualHiddenBeforeOverlay) {
+       root.manualHide = true
+     }
+@@ -588,6 +594,20 @@ Item {
+     }
+   }
+ 
++  // Raise one widget alone above all windows; calling again with the same id closes it
++  function summonWidget(id) {
++    if (root.overlayActive && root.soloWidgetId === id) {
++      root.closeOverlay()
++      return "closed"
++    }
++    if (!root.isWidgetEnabledInList(id, root.enabledWidgets)) return "not_enabled"
++    if (!root.overlayActive) root.wasManualHiddenBeforeOverlay = root.manualHide
++    root.preferencesOpen = false
++    root.soloWidgetId = id
++    root.overlayActive = true
++    return "opened"
++  }
++
+   // 📡 IPC Handler for toggling widgets or opening selector
+   IpcHandler {
+     target: "dagyr.desktop-widgets"
+@@ -600,6 +620,10 @@ Item {
+       root.layoutEditMode = !root.layoutEditMode
+     }
+ 
++    function summon(id: string): string {
++      return root.summonWidget(id)
++    }
++
+     function selector() {
+       root.selectorOpen = !root.selectorOpen
+     }
+@@ -752,7 +776,7 @@ Item {
+         exclusionMode: ExclusionMode.Ignore
+         WlrLayershell.namespace: "omarchy-desktop-widgets"
+         WlrLayershell.layer: (root.overlayActive || root.preferencesOpen || root.keyboardFocusRequested) ? WlrLayer.Overlay : WlrLayer.Bottom
+-        WlrLayershell.keyboardFocus: (root.overlayActive || root.preferencesOpen || root.keyboardFocusRequested) ? WlrKeyboardFocus.OnDemand : ((!desktopWindow.hasOpenWindows && root.selectorOpen) ? WlrKeyboardFocus.OnDemand : WlrKeyboardFocus.None)
++        WlrLayershell.keyboardFocus: root.soloWidgetId !== "" ? WlrKeyboardFocus.Exclusive : (root.overlayActive || root.preferencesOpen || root.keyboardFocusRequested) ? WlrKeyboardFocus.OnDemand : ((!desktopWindow.hasOpenWindows && root.selectorOpen) ? WlrKeyboardFocus.OnDemand : WlrKeyboardFocus.None)
+ 
+         Shortcut {
+           sequence: "Escape"
+@@ -1243,6 +1267,7 @@ Item {
+               active: root.isWidgetActiveOnMonitor(modelData.id, desktopWindow.monitorName)
+               source: modelData.componentUrl
+               z: 10
++              visible: root.soloWidgetId === "" || root.soloWidgetId === modelData.id
+ 
+               property real defaultX: item && item.defaultX !== undefined ? item.defaultX : Style.space(24)
+               property real defaultY: item && item.defaultY !== undefined ? item.defaultY : Style.space(64)
 diff --git a/components/WidgetSelector.qml b/components/WidgetSelector.qml
 index 6e42279..8b6cf6d 100644
 --- a/components/WidgetSelector.qml
@@ -372,10 +445,28 @@ index 54e7986..9369849 100644
    ]
  
 diff --git a/widgets/quick-notes/QuickNotesWidget.qml b/widgets/quick-notes/QuickNotesWidget.qml
-index d499815..2b7d327 100644
+index d499815..e6b0305 100644
 --- a/widgets/quick-notes/QuickNotesWidget.qml
 +++ b/widgets/quick-notes/QuickNotesWidget.qml
-@@ -85,6 +85,35 @@ WidgetCard {
+@@ -70,6 +70,17 @@ WidgetCard {
+     }
+   }
+ 
++  // Summoned alone via the keybind (IPC summon): drop the cursor into the active tab's input
++  Connections {
++    target: (rootRef && "soloWidgetId" in rootRef) ? rootRef : null
++    ignoreUnknownSignals: true
++    function onSoloWidgetIdChanged() {
++      if (rootRef.soloWidgetId !== notesWidgetRoot.widgetId) return
++      if (notesWidgetRoot.currentTab === "SCRATCHPAD") scratchpadEdit.forceActiveFocus()
++      else if (notesWidgetRoot.currentTab === "TASKS") taskInput.forceActiveFocus()
++    }
++  }
++
+   Component.onDestruction: {
+     if (rootRef && "keyboardFocusRequested" in rootRef && rootRef.keyboardFocusRequested) {
+       rootRef.keyboardFocusRequested = false
+@@ -85,6 +96,35 @@ WidgetCard {
    }
    readonly property int completedCount: todosList.length - pendingCount
    readonly property string notesManagerPath: Qt.resolvedUrl("notes_manager.py").toString().replace(/^file:\/\//, "")
@@ -411,7 +502,7 @@ index d499815..2b7d327 100644
  
    Process {
      id: notesProc
-@@ -93,15 +122,7 @@ WidgetCard {
+@@ -93,15 +133,7 @@ WidgetCard {
      stdout: SplitParser {
        onRead: function(line) {
          try {
